@@ -1,0 +1,2129 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#faf6ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171410" media="(prefers-color-scheme: dark)" />
+    <!-- Packaged-app hints: this single file is the whole app (no server,
+         no build step), so it can be wrapped as-is by Capacitor/Cordova
+         for iOS/Android, or installed from a browser. All data lives in
+         this device's local storage under one key. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="奮鬥卡" />
+    <link rel="icon" href="data:," />
+    <title>新奮鬥卡開發 HTML5</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&display=swap');
+
+      /* 字體大小 support is structural: every size in the app is in rem,
+         and the root font size is the single knob they all hang off —
+         html { font-size: calc(16px * var(--font-scale)) }. The app sets
+         --font-scale on <html> from the saved profile level (0.9–1.5),
+         so all text, spacing and tap targets scale together. The paper
+         card (.print-card) uses fixed px and never scales. */
+      :root {
+        color-scheme: light dark;
+        font-size: calc(16px * var(--font-scale, 1));
+        --bg: #faf6ee;
+        --surface: #fffdf7;
+        --text: #26221c;
+        --dim: #7a6f5c;
+        --border: #ddd2bd;
+        --accent: #b3352b;
+        --accent-ink: #b3352b;
+        --gold: #a97e2f;
+        --green: #059669;
+        --saved: #047857;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #171410;
+          --surface: #221e18;
+          --text: #f0e9db;
+          --dim: #a89a83;
+          --border: #3a332a;
+          --accent: #e0655a;
+          --gold: #c9a24d;
+          --saved: #34d399;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+        -webkit-text-size-adjust: 100%;
+      }
+      .font-display { font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; }
+
+      /* Phone tap targets: at least 32px tall. */
+      button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) { min-height: 2rem; }
+      button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 0; }
+      input, textarea, select { font: inherit; }
+      button:disabled { cursor: default; }
+
+      .wrap { margin: 0 auto; width: 100%; max-width: 48rem; padding: 0 1rem 2.5rem; }
+
+      /* ---- banner ---- */
+      .banner {
+        margin-top: 0.75rem; border: 1px solid var(--gold); border-radius: 0.5rem;
+        background: color-mix(in srgb, var(--gold) 10%, transparent);
+        padding: 0.625rem 0.75rem; font-size: 0.875rem; line-height: 1.5;
+      }
+      .banner button { font-weight: 700; color: var(--accent); text-decoration: underline; margin-left: 0.5rem; min-height: 2rem; }
+
+      /* ---- hero ---- */
+      .hero { margin-top: 1.25rem; }
+      .hero-date { font-size: 0.875rem; color: var(--dim); margin: 0; }
+      .hero-row { margin-top: 0.25rem; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem; }
+      .hero h1 { font-size: 2.25rem; line-height: 2.5rem; font-weight: 900; margin: 0; }
+      .streak { font-size: 0.875rem; color: var(--dim); margin: 0; }
+      .streak b { font-size: 1.125rem; color: var(--accent); }
+      .hero-actions { margin-top: 0.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      .hero-summary { font-size: 0.875rem; }
+
+      /* ---- buttons ---- */
+      .btn-accent { background: var(--accent-ink); color: #fff; border-radius: 0.5rem; padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 700; }
+      .btn-accent-sm { border: 1px solid var(--accent); color: var(--accent); border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 700; }
+      .btn-accent:disabled, .btn-outline-accent:disabled { opacity: 0.5; }
+      .btn-outline-accent { border: 1px solid var(--accent); color: var(--accent); border-radius: 0.5rem; padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 700; }
+      .btn-ghost { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem; }
+      .btn-ghost-lg { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem 1.25rem; font-size: 1rem; }
+
+      /* ---- tabs ---- */
+      .tabs { margin-top: 1.5rem; display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); }
+      .tabs button { padding: 0.625rem 1rem; font-size: 1rem; font-weight: 600; color: var(--dim); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+      .tabs button[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+      main { margin-top: 1rem; }
+      .loading { padding: 2.5rem 0; text-align: center; color: var(--dim); }
+      .load-error { padding: 2.5rem 0; text-align: center; color: var(--accent); }
+
+      /* ---- calendar toolbar ---- */
+      .cal-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      .seg { display: flex; overflow: hidden; border: 1px solid var(--border); border-radius: 0.5rem; }
+      .seg button { padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 600; min-height: 2.25rem; }
+      .seg button[aria-pressed="true"] { background: var(--accent-ink); color: #fff; }
+      .cal-title { font-size: 1.125rem; font-weight: 700; margin: 0; }
+      .cal-nav { margin-left: auto; display: flex; gap: 0.375rem; }
+      .cal-nav button { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; min-height: 2.25rem; }
+
+      /* ---- month grid ---- */
+      .dow { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 0.75rem; color: var(--dim); }
+      .dow div { padding: 0.25rem 0; }
+      .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.25rem; }
+      .cell {
+        display: flex; flex-direction: column; align-items: center; min-height: 4rem;
+        border-radius: 0.5rem; border: 1px solid transparent; background: transparent;
+        padding: 0.375rem 0.125rem; width: 100%;
+      }
+      .cell.filled { border-color: var(--border); background: var(--surface); }
+      .cell.today { border: 2px solid var(--accent); background: var(--surface); }
+      .cell .dnum { font-size: 1rem; font-weight: 600; line-height: 1; color: var(--dim); }
+      .cell.filled .dnum, .cell.today .dnum { color: var(--text); }
+      .cell .lunar { margin-top: 0.125rem; font-size: 0.625rem; line-height: 1; color: var(--dim); }
+      .badges { margin-top: 0.125rem; display: flex; align-items: center; justify-content: center; gap: 0.25rem; min-height: 0.375rem; }
+      .dot { display: inline-block; width: 0.375rem; height: 0.375rem; border-radius: 9999px; }
+      .dot.green { background: var(--green); }
+      .dot.gold { background: var(--gold); }
+      .badges .total { font-size: 0.625rem; font-weight: 600; color: var(--gold); }
+      .shou {
+        margin-top: 0.125rem; display: inline-flex; width: 1rem; height: 1rem; flex-shrink: 0;
+        align-items: center; justify-content: center; border-radius: 0.25rem;
+        background: var(--accent-ink); color: #fff; font-size: 0.625rem; font-weight: 700; line-height: 1;
+      }
+      .cell .items-line { margin-top: 0.125rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.625rem; line-height: 1.25; color: var(--dim); }
+      .cal-foot { margin-top: 1rem; font-size: 0.875rem; color: var(--dim); }
+      .cal-legend { margin-top: 0.25rem; font-size: 0.75rem; color: var(--dim); }
+
+      /* ---- day list ---- */
+      .daylist { display: flex; flex-direction: column; gap: 0.375rem; }
+      .dayrow {
+        display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: left;
+        border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.625rem 0.75rem;
+      }
+      .dayrow.today { border: 2px solid var(--accent); }
+      .dayrow .d1 { width: 3.5rem; flex-shrink: 0; }
+      .dayrow .d1 b { display: block; font-size: 1rem; font-weight: 600; }
+      .dayrow .d1 span { display: block; font-size: 0.75rem; color: var(--dim); }
+      .dayrow .d2 { width: 4rem; flex-shrink: 0; font-size: 0.75rem; color: var(--dim); }
+      .dayrow .d3 { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
+      .dayrow .badges { margin-top: 0; }
+
+      /* ---- cards / sections ---- */
+      .card { border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 1rem; }
+      .card h2 { font-size: 1.125rem; font-weight: 700; margin: 0; }
+      .card .hint { margin-top: 0.25rem; font-size: 0.875rem; color: var(--dim); line-height: 1.5; }
+      .stack { display: flex; flex-direction: column; gap: 1.5rem; }
+      .field label { display: block; font-size: 0.875rem; color: var(--dim); }
+      .field input[type="text"], .field input:not([type]) {
+        margin-top: 0.25rem; width: 100%; border: 1px solid var(--border); background: var(--bg);
+        border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 1rem; color: var(--text);
+      }
+      .profile-grid { margin-top: 0.75rem; display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+      @media (min-width: 640px) { .profile-grid { grid-template-columns: repeat(3, 1fr); } }
+      .radio-col { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+      .radio-row { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; padding: 0.25rem 0; }
+      .radio-row input { margin-top: 0.25rem; width: 1rem; height: 1rem; accent-color: #b3352b; flex-shrink: 0; }
+      fieldset { border: none; margin: 0; padding: 0; }
+      fieldset legend { font-size: 0.875rem; color: var(--dim); padding: 0; }
+      .saved-note { font-size: 0.875rem; color: var(--saved); }
+      .err { font-size: 0.875rem; color: var(--accent); }
+
+      /* ---- font size setting ---- */
+      .font-row { margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+      .font-btn {
+        display: flex; width: 3.5rem; height: 3.5rem; flex-shrink: 0; align-items: center; justify-content: center;
+        border-radius: 9999px; border: 2px solid var(--border); background: var(--bg);
+        font-size: 1.875rem; font-weight: 700; line-height: 1;
+      }
+      .font-btn:disabled { opacity: 0.3; }
+      .font-cur { min-width: 0; flex: 1; text-align: center; margin: 0; }
+      .font-cur b { display: block; font-size: 1.5rem; font-weight: 700; }
+      .font-cur span { display: block; font-size: 0.875rem; color: var(--dim); }
+
+      /* ---- reflection settings ---- */
+      .refl-list { margin-top: 0.5rem; list-style: none; padding: 0; }
+      .refl-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-top: 1px solid var(--border); }
+      .refl-list li:first-child { border-top: none; }
+      .refl-list input {
+        min-width: 0; flex: 1; border: 1px solid var(--border); background: var(--bg);
+        border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 1rem; color: var(--text);
+      }
+      .btn-sm { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 600; }
+      .btn-sm:disabled { opacity: 0.4; }
+      .btn-danger-sm { background: var(--accent-ink); color: #fff; border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 700; }
+      .add-row { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .add-row input {
+        min-width: 0; flex: 1; border: 1px solid var(--border); background: var(--bg);
+        border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 1rem; color: var(--text);
+      }
+      .btn-add { background: var(--accent-ink); color: #fff; border-radius: 0.5rem; padding: 0.625rem 1rem; font-size: 1rem; font-weight: 700; }
+      .btn-add:disabled { opacity: 0.5; }
+
+      /* ---- snapshots ---- */
+      .snap-list { margin-top: 0.5rem; list-style: none; padding: 0; }
+      .snap-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.625rem 0; border-top: 1px solid var(--border); }
+      .snap-list li:first-child { border-top: none; }
+      .snap-info { min-width: 0; flex: 1; }
+      .snap-info b { display: block; font-size: 1rem; font-weight: 400; }
+      .snap-info span { display: block; font-size: 0.75rem; color: var(--dim); }
+
+      /* ---- birthday list (settings) ---- */
+      .bday-month { margin-top: 1rem; }
+      .bday-month h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+      .bday-month ul { margin-top: 0.25rem; list-style: none; padding: 0; }
+      .bday-month li { padding: 0.5rem 0; border-top: 1px solid var(--border); }
+      .bday-month li:first-child { border-top: none; }
+      .bday-month .bd-date { font-size: 0.875rem; font-weight: 600; margin: 0; }
+      .bday-month .bd-date span { margin-left: 0.5rem; font-weight: 400; color: var(--dim); }
+      .bday-month .bd-occ { margin: 0.125rem 0 0; font-size: 0.875rem; line-height: 1.5; }
+
+      /* ---- report ---- */
+      .report-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      .report-tools label { font-size: 0.875rem; color: var(--dim); }
+      .report-tools select { border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.375rem 0.5rem; color: var(--text); }
+      .report-tools .btn-accent { margin-left: auto; padding: 0.5rem 1rem; font-size: 0.875rem; }
+      .stat-grid { margin-top: 1rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+      @media (min-width: 640px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+      .stat { border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.625rem 0.75rem; }
+      .stat p { margin: 0; }
+      .stat .sl { font-size: 0.75rem; color: var(--dim); }
+      .stat .sv { font-size: 1.25rem; font-weight: 700; margin-top: 0.125rem; }
+      .tally { margin-top: 1rem; border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.75rem; }
+      .tally > p.title { font-size: 0.875rem; font-weight: 500; margin: 0; }
+      .tally-grid { margin-top: 0.5rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.25rem 1rem; }
+      @media (min-width: 640px) { .tally-grid { grid-template-columns: repeat(3, 1fr); } }
+      .tally-grid p { display: flex; justify-content: space-between; font-size: 0.875rem; margin: 0; }
+      .tally-grid p b { font-weight: 600; color: var(--accent); }
+      .tally .sit-line { margin-top: 0.75rem; font-size: 0.875rem; }
+      .tally .sit-line b { font-weight: 600; color: var(--accent); }
+      .report-note { margin-top: 1rem; font-size: 0.875rem; color: var(--dim); line-height: 1.5; }
+      .card-scroll { margin-top: 0.5rem; overflow-x: auto; border: 1px solid var(--border); border-radius: 0.5rem; }
+      .card-scroll > div { min-width: 1060px; }
+
+      /* ---- print preview ---- */
+      .pp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding-top: 1rem; }
+      .pp-title { font-size: 1.125rem; font-weight: 700; margin: 0; }
+      .pp-desc { margin-top: 0.75rem; font-size: 0.875rem; line-height: 1.5; color: var(--dim); }
+      .pp-actions { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+      .pp-cardwrap { overflow-x: auto; padding: 0 0.5rem 1.5rem; }
+      .pp-cardwrap > div { margin: 0 auto; min-width: 1060px; max-width: 72rem; }
+
+      /* ---- modal panel ---- */
+      .overlay {
+        position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center;
+        background: rgba(0, 0, 0, 0.5);
+      }
+      @media (min-width: 640px) { .overlay { align-items: center; } }
+      .panel {
+        display: flex; max-height: 92vh; width: 100%; max-width: 32rem; flex-direction: column;
+        border-radius: 1rem 1rem 0 0; background: var(--bg);
+      }
+      @media (min-width: 640px) { .panel { border-radius: 1rem; } }
+      .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: 1rem 1rem 0; }
+      .panel-head h2 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+      .panel-head .lunar-line { margin-top: 0.125rem; font-size: 0.875rem; color: var(--dim); }
+      .close-x { border: 1px solid var(--border); border-radius: 9999px; padding: 0.25rem 0.75rem; font-size: 1.125rem; line-height: 1; min-height: 2.25rem; }
+      .panel-bday { padding: 0.75rem 1rem 0; }
+      .panel-bday button {
+        width: 100%; border: 1px solid var(--gold); border-radius: 0.5rem;
+        background: color-mix(in srgb, var(--gold) 10%, transparent);
+        padding: 0.625rem 1rem; font-size: 1rem; font-weight: 700;
+      }
+      .panel-body { overflow-y: auto; padding: 0 1rem 0.5rem; }
+      .panel-body fieldset { margin-top: 1.5rem; }
+      .panel-body fieldset.first { margin-top: 1rem; }
+      .panel-body legend { font-size: 1rem; font-weight: 700; color: var(--text); font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; }
+      .panel-body .sub { margin-top: 0.25rem; font-size: 0.75rem; color: var(--dim); }
+      .item-list { margin-top: 0.5rem; display: grid; grid-template-columns: 1fr; gap: 0.375rem; }
+      .item-row {
+        display: flex; cursor: pointer; align-items: center; gap: 0.75rem;
+        border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.625rem 0.75rem;
+        min-height: 2.75rem;
+      }
+      .item-row.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+      .item-row input { width: 1.25rem; height: 1.25rem; flex-shrink: 0; accent-color: #b3352b; }
+      .item-row .num { width: 1.75rem; flex-shrink: 0; text-align: center; font-size: 1rem; font-weight: 700; color: var(--accent); }
+      .item-row .nm { font-size: 1rem; }
+      .note-field { margin-top: 1rem; }
+      .note-field label { font-size: 0.875rem; font-weight: 500; }
+      textarea, .text-input {
+        margin-top: 0.25rem; width: 100%; border: 1px solid var(--border); background: var(--surface);
+        border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 1rem; color: var(--text);
+      }
+      .stepper { margin-top: 0.5rem; display: grid; grid-template-columns: 1fr; gap: 1rem; }
+      .stepper label { font-size: 0.875rem; font-weight: 500; }
+      .stepper .row { margin-top: 0.25rem; display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; }
+      .stepper input {
+        width: 100%; min-width: 5.5rem; flex: 1; border: 1px solid var(--border); background: var(--surface);
+        border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 1.125rem; color: var(--text);
+      }
+      .stepper .add-btn { flex-shrink: 0; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--accent); }
+      .stepper .clear-btn { flex-shrink: 0; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0 0.75rem; font-size: 0.875rem; color: var(--dim); }
+      .classic-list { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.375rem; }
+      .classic-row {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+        border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.5rem 0.75rem;
+      }
+      .classic-row .cname { min-width: 6rem; flex: 1; font-size: 1rem; }
+      .classic-row .cbtn { width: 2.25rem; height: 2.25rem; flex-shrink: 0; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1.125rem; font-weight: 700; }
+      .classic-row .cbtn.plus { color: var(--accent); }
+      .classic-row .cbtn:disabled { opacity: 0.4; }
+      .classic-row .cval { width: 2.5rem; flex-shrink: 0; text-align: center; font-size: 1.125rem; font-weight: 700; }
+      .classic-row .cclear { flex-shrink: 0; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.375rem 0.625rem; font-size: 0.875rem; color: var(--dim); }
+      .classic-row .cclear:disabled { opacity: 0.4; }
+      .sit-row { margin-top: 0.5rem; display: flex; align-items: flex-end; gap: 0.5rem; }
+      .sit-cell { min-width: 0; flex: 1; }
+      .sit-cell label { display: block; text-align: center; font-size: 0.875rem; color: var(--dim); }
+      .sit-cell input {
+        margin-top: 0.25rem; width: 100%; border: 1px solid var(--border); background: var(--surface);
+        border-radius: 0.5rem; padding: 0.5rem; text-align: center; font-size: 1.125rem; color: var(--text);
+      }
+      .sit-total { flex-shrink: 0; padding-bottom: 0.5rem; font-size: 0.875rem; margin: 0; }
+      .sit-total b { font-size: 1.125rem; color: var(--accent); }
+      .refl-fields { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+      .refl-fields label { font-size: 0.875rem; font-weight: 500; }
+      .panel-foot { border-top: 1px solid var(--border); padding: 0.75rem 1rem; }
+      .panel-foot .row { display: flex; gap: 0.5rem; }
+      .panel-foot .save { flex: 1; }
+      .btn-del { border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem 1rem; font-size: 1rem; color: var(--dim); }
+      .btn-del-confirm { border: 1px solid var(--accent); border-radius: 0.5rem; padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; color: var(--accent); }
+
+      /* ---- birthday popup ---- */
+      .overlay-bday { z-index: 60; }
+      .bday-panel {
+        max-height: 85vh; width: 100%; max-width: 28rem; overflow-y: auto;
+        border-radius: 1rem 1rem 0 0; background: var(--bg); padding: 1rem;
+      }
+      @media (min-width: 640px) { .bday-panel { border-radius: 1rem; } }
+      .bday-panel h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+      .bday-fest { margin-top: 0.25rem; font-size: 0.875rem; color: var(--dim); }
+      .bday-list { margin-top: 0.75rem; list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+      .bday-list li {
+        display: flex; align-items: center; gap: 0.5rem;
+        border: 1px solid var(--border); background: var(--surface); border-radius: 0.5rem; padding: 0.625rem 0.75rem;
+      }
+      .bday-list .on { min-width: 0; flex: 1; font-size: 1rem; }
+      .bday-list .ot {
+        flex-shrink: 0; border-radius: 9999px; padding: 0.125rem 0.625rem;
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+        font-size: 0.875rem; font-weight: 700; color: var(--accent);
+      }
+      .bday-note { margin-top: 0.5rem; font-size: 0.75rem; color: var(--dim); }
+      .bday-close { margin-top: 1rem; width: 100%; }
+
+      /* ---- faithful paper card (fixed px; never scales) ---- */
+      .print-card { background: #fff; color: #000; font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; padding: 12px; }
+      .pc-flex { display: flex; align-items: stretch; gap: 8px; }
+      .pc-motto { display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 0 2px; font-size: 19px; font-weight: 700; flex-shrink: 0; }
+      .pc-left { flex: 1.12 1 0%; min-width: 0; }
+      .pc-right { flex: 1 1 0%; min-width: 0; border: 2px solid #171717; }
+      .pc-title { text-align: center; font-size: 19px; font-weight: 900; letter-spacing: 0.08em; margin: 0; padding-bottom: 6px; }
+      .pc-table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid #171717; }
+      .pc-table td { border: 1px solid #262626; text-align: center; vertical-align: middle; padding: 0; }
+      .pc-who { height: 52px; }
+      .pc-lab2 { font-size: 15px; line-height: 1.15; }
+      .pc-val { font-size: 20px; font-weight: 700; }
+      .pc-temple { font-size: 17px; }
+      .pc-dh { padding: 4px 0; font-size: 16px; font-weight: 700; line-height: 1.25; }
+      .pc-vv { height: 148px; vertical-align: top; }
+      .pc-items { font-weight: 700; text-align: center; padding-top: 6px; }
+      .pc-items.f0 { font-size: 19px; line-height: 1.9; }
+      .pc-items.f1 { font-size: 17px; line-height: 1.55; }
+      .pc-items.f2 { font-size: 15px; line-height: 1.4; }
+      .pc-items.f3 { font-size: 13px; line-height: 1.3; }
+      .pc-note { padding: 4px 2px 0; text-align: center; font-size: 10px; line-height: 1.25; word-break: break-all; }
+      .pc-lab { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; font-size: 15px; font-weight: 700; }
+      .pc-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; font-size: 15px; margin: 6px 0 0; }
+      .pc-total .sub { font-size: 11px; color: #525252; }
+      .pc-rt { text-align: center; font-size: 17px; font-weight: 700; letter-spacing: 0.35em; margin: 0; padding-top: 8px; }
+      .pc-ritems { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; padding: 6px 12px 10px; font-size: 13px; line-height: 1.9; }
+      .pc-ritems p { margin: 0; text-align: left; }
+      .pc-rsec { border-top: 2px solid #171717; padding-bottom: 8px; }
+      .pc-rnotes { padding: 6px 12px 0; font-size: 12px; line-height: 1.75; }
+      .pc-rnotes p { margin: 0 0 2px; text-align: left; }
+
+      /* ---- print: only the faithful paper card prints ---- */
+      .print-only { display: none; }
+      @media print {
+        :root { font-size: 16px !important; }
+        .screen-only { display: none !important; }
+        .print-only { display: block !important; }
+        html, body { height: auto !important; background: #fff !important; }
+        .print-card { break-inside: avoid; }
+        @page { size: A4 landscape; margin: 8mm; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="overlay-root"></div>
+    <div id="print-root" class="print-only" aria-hidden="true"></div>
+    <script>
+      "use strict";
+
+      /* ================================================================
+         新奮鬥卡 (HTML5 single-file edition)
+         Migrated from the 新奮鬥卡開發 space, keeping its look and feel.
+         Differences forced by the single-file form: no server — all data
+         is stored on this device (localStorage, one key), and the
+         monthly archive snapshot is taken lazily when the app is first
+         opened in a new month instead of by a scheduled job.
+         ================================================================ */
+
+      var ITEMS = [
+        { n: 1, name: "祈禱反省懺悔" },
+        { n: 2, name: "持誦兩誥救劫" },
+        { n: 3, name: "力行人生守則" },
+        { n: 4, name: "修持煉心靜坐" },
+        { n: 5, name: "參加會禱會坐" },
+        { n: 6, name: "持誦基本經典" },
+        { n: 7, name: "量力財施奉獻" },
+        { n: 8, name: "弘教親和法施" },
+        { n: 9, name: "熱心教內服務" },
+        { n: 10, name: "參加教內活動" },
+        { n: 11, name: "研讀教內經典" },
+        { n: 12, name: "其他善行活動" },
+      ];
+
+      /** The six basic classics （基本經典）, in the 經典 section's fixed order. */
+      var CLASSICS = [
+        "廿字真經",
+        "奮鬥真經",
+        "天人親和真經",
+        "北斗徵祥真經",
+        "平等真經",
+        "大同真經",
+      ];
+
+      /** 字體大小 levels (Settings): index stored on the profile. */
+      var FONT_LEVELS = [
+        { label: "小", pct: 90 },
+        { label: "標準", pct: 100 },
+        { label: "大", pct: 115 },
+        { label: "特大", pct: 130 },
+        { label: "超大", pct: 150 },
+      ];
+
+      var WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+      /** New-day default checks: items 1 and 4 only (per the user's real card). */
+      var NEW_DAY_DEFAULTS = [1, 4];
+
+      function pad(n) { return String(n).padStart(2, "0"); }
+      function isoOf(y, m, d) { return y + "-" + pad(m) + "-" + pad(d); }
+      function todayLocal() {
+        var now = new Date();
+        return {
+          iso: isoOf(now.getFullYear(), now.getMonth() + 1, now.getDate()),
+          y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(),
+        };
+      }
+      function parseIso(iso) {
+        var p = String(iso).split("-").map(Number);
+        return { y: p[0] || 1970, m: p[1] || 1, d: p[2] || 1 };
+      }
+      function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+      function esc(s) {
+        return String(s == null ? "" : s)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+      function fmtNum(n) { return n.toLocaleString("zh-Hant"); }
+      function fmtCount(n) { return n === null ? "—" : fmtNum(n); }
+
+      /* ------------------------------------------------------------
+         Lunar calendar helpers built on the platform's Chinese
+         calendar (Intl.DateTimeFormat "chinese") — no external data.
+         干支月 uses the standard 年上起月 rule from the lunar year stem.
+         ------------------------------------------------------------ */
+      var STEMS = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"];
+      var BRANCHES = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"];
+      var monthDayFmt = new Intl.DateTimeFormat("zh-Hant-u-ca-chinese", { month: "long", day: "numeric" });
+      var DIGITS = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+      var MONTH_NAMES = ["正月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "冬月", "臘月"];
+
+      // Some WebView/ICU builds return raw month codes like "M10" (or
+      // "閏M6") instead of 十月. Map those back to the proper name.
+      function normalizeMonthName(raw) {
+        var isLeap = raw.indexOf("閏") === 0;
+        var base = isLeap ? raw.slice(1) : raw;
+        var match = /^M(\d{1,2})$/i.exec(base) || /^(\d{1,2})月?$/.exec(base);
+        if (match) {
+          var name = MONTH_NAMES[Number(match[1]) - 1];
+          if (name) return (isLeap ? "閏" : "") + name;
+        }
+        return raw;
+      }
+
+      var lnyCache = {};
+      function lunarNewYearIso(gregYear) {
+        if (lnyCache[gregYear]) return lnyCache[gregYear];
+        var found = gregYear + "-02-20";
+        for (var off = 0; off <= 40; off++) {
+          var dt = new Date(Date.UTC(gregYear, 0, 20 + off, 12));
+          var mn = "", dd = 0;
+          var parts = monthDayFmt.formatToParts(dt);
+          for (var i = 0; i < parts.length; i++) {
+            if (parts[i].type === "month") mn = normalizeMonthName(parts[i].value);
+            if (parts[i].type === "day") dd = Number(parts[i].value);
+          }
+          if (mn === "正月" && dd === 1) {
+            found = gregYear + "-" + pad(dt.getUTCMonth() + 1) + "-" + pad(dt.getUTCDate());
+            break;
+          }
+        }
+        lnyCache[gregYear] = found;
+        return found;
+      }
+
+      function yearGanzhiFor(y, m, d) {
+        var iso = isoOf(y, m, d);
+        var lunarYear = iso >= lunarNewYearIso(y) ? y : y - 1;
+        return STEMS[(lunarYear - 4) % 10] + BRANCHES[(lunarYear - 4) % 12];
+      }
+
+      function lunarDayName(day) {
+        if (day <= 0) return "";
+        if (day < 10) return "初" + DIGITS[day];
+        if (day === 10) return "初十";
+        if (day < 20) return "十" + DIGITS[day - 10];
+        if (day === 20) return "二十";
+        if (day < 30) return "廿" + DIGITS[day - 20];
+        return "三十";
+      }
+
+      var lunarCache = {};
+      function lunarInfo(y, m, d) {
+        var key = y + "-" + m + "-" + d;
+        if (lunarCache[key]) return lunarCache[key];
+        var date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+        var monthName = "", day = 0;
+        var parts = monthDayFmt.formatToParts(date);
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].type === "month") monthName = normalizeMonthName(parts[i].value);
+          if (parts[i].type === "day") day = Number(parts[i].value);
+        }
+        var yearGanzhi = yearGanzhiFor(y, m, d);
+        var isLeap = monthName.indexOf("閏") === 0;
+        var baseMonthName = isLeap ? monthName.slice(1) : monthName;
+        var baseIdx = MONTH_NAMES.indexOf(baseMonthName);
+        var monthIndex = baseIdx >= 0 ? baseIdx + 1 : 1;
+        var yearStemIdx = STEMS.indexOf(yearGanzhi.charAt(0));
+        var monthGanzhi = "";
+        if (yearStemIdx >= 0 && baseIdx >= 0) {
+          var firstStem = ((yearStemIdx % 5) * 2 + 2) % 10;
+          monthGanzhi = STEMS[(firstStem + baseIdx) % 10] + BRANCHES[(2 + baseIdx) % 12];
+        }
+        var dayName = lunarDayName(day);
+        var info = {
+          monthName: monthName,
+          monthIndex: monthIndex,
+          isLeap: isLeap,
+          day: day,
+          fullLabel: monthName + dayName,
+          shortLabel: day === 1 ? monthName : dayName,
+          yearGanzhi: yearGanzhi,
+          monthGanzhi: monthGanzhi,
+        };
+        lunarCache[key] = info;
+        return info;
+      }
+
+      /* ------------------------------------------------------------
+         仙佛聖（華）誕暨顯應日 table, keyed by lunar month/day.
+         Extracted from the 丙午年宣禮應用表 (《附表》民114.12.10).
+         Only lunar-dated deity occasions are included; solar-dated
+         entries （中正真人 10/31、中山真人 11/12、御清聖尊 冬至） and
+         solar 教節 are intentionally left out. Days that are also a
+         教節/特定日 carry the festival name.
+         Matching rules (see birthdaysFor):
+         - Leap-month rule: an entry matches only the regular
+           (non-leap) lunar month; leap months never match.
+         - 30th-day rule: when a lunar month has no 30th day, entries
+           stored on the 30th are observed on the 29th.
+         ------------------------------------------------------------ */
+      function o(name, type) { return { name: name, type: type }; }
+
+      var BIRTHDAY_TABLE = [
+        { month: 1, day: 1, festival: "祀天節", occasions: [o("崑崙老祖", "至誕"), o("平劫主宰都帥", "華誕"), o("彌勒古佛", "華誕"), o("第三天懷遠天天王", "華誕"), o("清涼聖母", "元誕"), o("神農教主", "華誕")] },
+        { month: 1, day: 5, occasions: [o("無生聖宮左相天機閣首席參議太虛子", "至誕"), o("第十三天琳聲天天王", "華誕"), o("第二天慎之天天王", "華誕")] },
+        { month: 1, day: 6, occasions: [o("金闕左首相姜", "華誕")] },
+        { month: 1, day: 9, occasions: [o("道統始祖宇宙主宰玄穹高上帝", "至誕")] },
+        { month: 1, day: 13, occasions: [o("協天大帝", "華誕")] },
+        { month: 1, day: 15, occasions: [o("先天無生聖母", "聖誕"), o("金闕玄武大元帥有熊氏軒轅黃帝", "華誕")] },
+        { month: 1, day: 16, occasions: [o("先天鈞天上帝", "至誕"), o("無生聖宮右相天機閣主任秘書玄玄上帝", "至誕"), o("第三十天妙儀天天王", "華誕")] },
+        { month: 1, day: 19, occasions: [o("第二十一天釋化天天王", "華誕")] },
+        { month: 1, day: 22, occasions: [o("第十五天蕭蕭天天王", "華誕")] },
+        { month: 1, day: 23, occasions: [o("第十二天瀟然天天王", "華誕")] },
+        { month: 1, day: 26, occasions: [o("第七天鸞鳴天天王", "華誕")] },
+        { month: 1, day: 27, occasions: [o("第二十四天虛為天天王", "華誕")] },
+        { month: 1, day: 30, occasions: [o("泰清聖尊", "華誕"), o("過特首相", "華誕"), o("金闕岳武特首相", "華誕"), o("第二十九天渺渺天天王", "華誕"), o("第一天震天天天王", "華誕")] },
+        { month: 2, day: 2, occasions: [o("五老水祖渺渺溟溟大天尊", "華誕"), o("第八天暴烈天天王", "華誕"), o("神德教主（帝堯）", "華誕")] },
+        { month: 2, day: 3, occasions: [o("日光大帝", "華誕")] },
+        { month: 2, day: 5, occasions: [o("華光聖母", "元誕")] },
+        { month: 2, day: 10, occasions: [o("天德主宰", "華誕")] },
+        { month: 2, day: 12, occasions: [o("第十八天龍虎天天王", "華誕")] },
+        { month: 2, day: 13, occasions: [o("第二十天哈哈天天王", "華誕")] },
+        { month: 2, day: 15, occasions: [o("先天天樞總聖", "至誕"), o("金闕特上相文昌帝君", "華誕"), o("太上教主", "華誕")] },
+        { month: 2, day: 16, occasions: [o("金闕應元刑部尚書張桓侯", "華誕"), o("第二十三天非非天天王", "華誕")] },
+        { month: 2, day: 17, occasions: [o("金闕應元工部尚書魯", "華誕")] },
+        { month: 2, day: 19, occasions: [o("慈航觀世音菩薩", "元誕")] },
+        { month: 2, day: 20, occasions: [o("第九天木鐸天天王", "華誕")] },
+        { month: 3, day: 3, occasions: [o("紫微北極大帝", "華誕"), o("金闕真武大元帥有巢氏玄天大帝", "華誕")] },
+        { month: 3, day: 6, occasions: [o("第二十六天敬銘天天王", "華誕")] },
+        { month: 3, day: 8, occasions: [o("亞天聖父", "華誕")] },
+        { month: 3, day: 13, occasions: [o("禦寇教主", "華誕")] },
+        { month: 3, day: 15, occasions: [o("承德至尊崇仁大帝", "華誕")] },
+        { month: 3, day: 20, occasions: [o("金闕應元吏部尚書比干", "華誕")] },
+        { month: 3, day: 25, occasions: [o("悅意夫人", "元誕")] },
+        { month: 3, day: 30, occasions: [o("第十天一線天天王", "華誕")] },
+        { month: 4, day: 1, occasions: [o("金闕應元選舉部尚書李", "華誕")] },
+        { month: 4, day: 3, occasions: [o("金闕天朋大元帥殷", "華誕")] },
+        { month: 4, day: 4, festival: "慈恩節", occasions: [o("坤元輔教慈恩聖母", "元誕"), o("五老木祖青玄至極聖", "華誕"), o("神穆教主（帝舜）", "華誕")] },
+        { month: 4, day: 5, festival: "本師節", occasions: [o("本師世尊極初大帝", "華誕"), o("三期主宰", "華誕"), o("無始古佛", "華誕"), o("春期主宰", "華誕"), o("天人教主", "華誕"), o("清靈主宰維法佛王", "華誕"), o("無極無聖英皇", "華誕"), o("第三十二天無極天天王", "華誕"), o("第三十一天玄極天天王", "華誕")] },
+        { month: 4, day: 8, occasions: [o("釋迦教主", "華誕")] },
+        { month: 4, day: 12, occasions: [o("亞天聖母", "元誕")] },
+        { month: 4, day: 14, occasions: [o("呂祖", "華誕")] },
+        { month: 4, day: 18, occasions: [o("宇宙監經大天尊", "華誕"), o("太覺威靈大天尊", "華誕")] },
+        { month: 4, day: 19, occasions: [o("燧人氏", "華誕")] },
+        { month: 4, day: 21, occasions: [o("無形古佛", "華誕")] },
+        { month: 5, day: 1, occasions: [o("五老火祖性文至剛靈根", "華誕")] },
+        { month: 5, day: 4, festival: "坤元日", occasions: [o("坤元輔教慈恩聖母", "證道")] },
+        { month: 5, day: 6, occasions: [o("伏羲皇帝", "華誕")] },
+        { month: 5, day: 10, occasions: [o("太白金祖", "華誕")] },
+        { month: 5, day: 13, occasions: [o("一炁宗主", "華誕"), o("中皇玄靈上帝", "華誕"), o("天德教主", "華誕")] },
+        { month: 5, day: 30, occasions: [o("國基福祿壽三清座壽祖延壽秉德至尊", "華誕")] },
+        { month: 6, day: 1, occasions: [o("第六天無文天天王", "華誕"), o("鴻鈞老祖", "華誕")] },
+        { month: 6, day: 5, occasions: [o("掌德夫人", "元誕")] },
+        { month: 6, day: 6, occasions: [o("金闕龐特相", "華誕"), o("應元都天少皇", "華誕"), o("第十九天怒雷天天王", "華誕")] },
+        { month: 6, day: 9, occasions: [o("第二十二天空空天天王", "華誕")] },
+        { month: 6, day: 10, occasions: [o("濟佛祖", "華誕")] },
+        { month: 6, day: 16, occasions: [o("行劫副主宰清期子", "華誕")] },
+        { month: 6, day: 17, occasions: [o("第二十五天阿佐天天王", "華誕")] },
+        { month: 6, day: 18, occasions: [o("源天天皇", "華誕"), o("金闕應元兵部尚書胡", "華誕"), o("第十四天霹靂天天王", "華誕")] },
+        { month: 6, day: 19, occasions: [o("金闕應元雷部尚書王", "華誕")] },
+        { month: 6, day: 24, occasions: [o("王尚宰", "華誕")] },
+        { month: 7, day: 1, occasions: [o("金闕應元禮部尚書周公", "華誕")] },
+        { month: 7, day: 2, occasions: [o("玄德少祖", "華誕"), o("上元夫人", "元誕")] },
+        { month: 7, day: 3, occasions: [o("天極教主（盤古氏）", "華誕")] },
+        { month: 7, day: 5, occasions: [o("掌文夫人", "元誕")] },
+        { month: 7, day: 7, occasions: [o("土德王", "華誕"), o("第五天浩然天天王", "華誕")] },
+        { month: 7, day: 13, occasions: [o("北宗洪祖", "華誕")] },
+        { month: 7, day: 16, occasions: [o("萬靈兼主", "華誕")] },
+        { month: 7, day: 18, occasions: [o("瑤池金母", "金誕"), o("應元地曹少皇", "華誕")] },
+        { month: 7, day: 30, occasions: [o("國基福祿壽三清座祿祖法源德玄上真", "華誕"), o("地藏菩薩", "華誕")] },
+        { month: 8, day: 1, occasions: [o("首席正法文略導師", "華誕")] },
+        { month: 8, day: 4, occasions: [o("文皇倉頡夫子", "華誕")] },
+        { month: 8, day: 8, occasions: [o("五老土祖混混源源祖", "華誕"), o("神明教主（帝禹）", "華誕")] },
+        { month: 8, day: 15, festival: "祀道節", occasions: [o("紫微北極大帝", "顯應"), o("無聲玄母", "元誕"), o("淨元如來", "元誕"), o("紫英掌印夫人", "元誕")] },
+        { month: 8, day: 16, occasions: [o("御使十方清平皇君大總監", "華誕")] },
+        { month: 8, day: 27, occasions: [o("大成至聖", "華誕"), o("文宣素王", "華誕")] },
+        { month: 9, day: 1, occasions: [o("先天無生聖母", "顯應"), o("道統始祖宇宙主宰玄穹高上帝", "顯應")] },
+        { month: 9, day: 2, occasions: [o("中皇玄靈上帝", "顯應")] },
+        { month: 9, day: 4, occasions: [o("摩利攴天大聖先天斗姥元君", "顯應")] },
+        { month: 9, day: 5, occasions: [o("源天天皇", "顯應")] },
+        { month: 9, day: 6, occasions: [o("三期主宰", "顯應")] },
+        { month: 9, day: 7, occasions: [o("金闕玄武大元帥有熊氏軒轅黃帝", "顯應")] },
+        { month: 9, day: 8, occasions: [o("瑤池金母", "顯應")] },
+        { month: 9, day: 9, occasions: [o("先天鈞天上帝", "顯應"), o("無生聖宮左相天機閣首席參議太虛子", "顯應"), o("泰清聖尊", "顯應"), o("南斗", "華誕"), o("金闕玉虛十一祖文特上相", "華誕"), o("萬法教主", "華誕"), o("金闕真武大元帥有巢氏玄天大帝", "顯應"), o("萬法凡主宰九天玄女", "元誕")] },
+        { month: 9, day: 10, occasions: [o("木德王", "華誕"), o("金德王", "華誕"), o("火德王", "華誕"), o("水德王", "華誕"), o("開元計都星君", "華誕")] },
+        { month: 9, day: 16, occasions: [o("無上法王", "華誕"), o("金闕天佑大元帥子", "華誕")] },
+        { month: 9, day: 18, occasions: [o("李特首相", "華誕")] },
+        { month: 9, day: 19, occasions: [o("第二十七天玄明天天王", "華誕")] },
+        { month: 9, day: 30, occasions: [o("金闕右首相傅", "華誕"), o("國基福祿壽三清座福祖洪化一炁靈根", "華誕")] },
+        { month: 10, day: 1, occasions: [o("尚清聖尊", "華誕"), o("太靈殿主", "華誕"), o("第二十八天太荒天天王", "華誕"), o("第十一天虎臥天天王", "華誕"), o("武王", "華誕")] },
+        { month: 10, day: 9, occasions: [o("殿左直奏中天太傅", "華誕")] },
+        { month: 10, day: 10, occasions: [o("文王", "華誕")] },
+        { month: 10, day: 11, occasions: [o("第四天激烈天天王", "華誕")] },
+        { month: 10, day: 15, occasions: [o("開元羅睺星君", "華誕")] },
+        { month: 10, day: 16, occasions: [o("金闕特相諸葛", "華誕"), o("第十七天月朗天天王", "華誕")] },
+        { month: 10, day: 20, occasions: [o("萬定師主", "華誕")] },
+        { month: 11, day: 8, occasions: [o("金闕玉樞六祖普濟開元妙道天尊", "華誕")] },
+        { month: 11, day: 11, occasions: [o("第十六天心印天天王", "華誕")] },
+        { month: 11, day: 12, occasions: [o("金闕應元瘟部尚書張", "華誕")] },
+        { month: 11, day: 20, occasions: [o("金闕應元農部尚書后稷", "華誕")] },
+        { month: 11, day: 21, occasions: [o("首席督統鐳力前鋒", "華誕")] },
+        { month: 11, day: 28, occasions: [o("金闕葉特相", "華誕")] },
+        { month: 11, day: 30, occasions: [o("基督教主", "華誕")] },
+        { month: 12, day: 6, occasions: [o("雲龍教主", "華誕"), o("上元夫人", "元顯")] },
+        { month: 12, day: 9, festival: "清平節", occasions: [o("行劫主宰定危子", "華誕")] },
+        { month: 12, day: 10, occasions: [o("鎮河守嶽少皇", "華誕")] },
+        { month: 12, day: 17, occasions: [o("五老金祖烈煉金精主", "華誕")] },
+        { month: 12, day: 19, occasions: [o("先天萬聖靈根", "華誕")] },
+        { month: 12, day: 25, festival: "巡天節", occasions: [o("金闕特上相文昌帝君", "顯應")] },
+        { month: 12, day: 27, occasions: [o("春期副主宰", "證道")] },
+      ];
+
+      var LUNAR_MONTH_NAMES = MONTH_NAMES;
+
+      function lunarDateLabel(month, day) {
+        return (LUNAR_MONTH_NAMES[month - 1] || "") + lunarDayName(day);
+      }
+
+      /**
+       * Look up the deity occasions for one lunar date.
+       * isLeap — leap months never match (regular month only).
+       * isShortMonthEnd — day is the 29th and last day of a 29-day
+       * month: day-30 entries are observed today.
+       */
+      function birthdaysFor(monthIndex, day, isLeap, isShortMonthEnd) {
+        if (isLeap) return null;
+        var direct = null, thirtieth = null, i;
+        for (i = 0; i < BIRTHDAY_TABLE.length; i++) {
+          if (BIRTHDAY_TABLE[i].month === monthIndex && BIRTHDAY_TABLE[i].day === day) direct = BIRTHDAY_TABLE[i];
+          if (BIRTHDAY_TABLE[i].month === monthIndex && BIRTHDAY_TABLE[i].day === 30) thirtieth = BIRTHDAY_TABLE[i];
+        }
+        var merged = direct, observedEarly = false;
+        if (day === 29 && isShortMonthEnd && thirtieth) {
+          observedEarly = true;
+          merged = {
+            festival: (direct && direct.festival) || thirtieth.festival,
+            occasions: (direct ? direct.occasions : []).concat(thirtieth.occasions),
+          };
+        }
+        if (!merged || merged.occasions.length === 0) return null;
+        return { occasions: merged.occasions, festival: merged.festival, observedEarly: observedEarly };
+      }
+
+      /** Birthday match for a Gregorian date, with the panel's rules. */
+      function birthdayMatchFor(y, m, d) {
+        var lunar = lunarInfo(y, m, d);
+        var nd = new Date(y, m - 1, d + 1);
+        var nextLunar = lunarInfo(nd.getFullYear(), nd.getMonth() + 1, nd.getDate());
+        return birthdaysFor(lunar.monthIndex, lunar.day, lunar.isLeap, lunar.day === 29 && nextLunar.day === 1);
+      }
+
+      /* ------------------------------------------------------------
+         Local store — the whole app state under one localStorage key.
+         Shape mirrors the source space's state exactly, so JSON
+         backups exported from either version import into the other:
+         { profile, entries, reflectionItems } plus snapshot slots.
+         ------------------------------------------------------------ */
+      var STORE_KEY = "xin-fendouka-html5-v1";
+
+      function defaultProfile() {
+        return { temple: "", name: "", daoName: "", baoUnit: "ben", fontSize: 1 };
+      }
+      function defaultState() {
+        return { profile: defaultProfile(), entries: [], reflectionItems: [], snapshots: {}, archivedMonth: null };
+      }
+
+      function normClassics(raw) {
+        var out = [0, 0, 0, 0, 0, 0];
+        if (Array.isArray(raw)) {
+          raw.slice(0, 6).forEach(function (v, i) {
+            if (typeof v === "number" && isFinite(v) && v >= 0) out[i] = Math.floor(v);
+          });
+        }
+        return out;
+      }
+      function normSitting(raw) {
+        var out = [null, null, null, null];
+        if (Array.isArray(raw)) {
+          raw.slice(0, 4).forEach(function (v, i) {
+            if (typeof v === "number" && isFinite(v) && v >= 0) out[i] = Math.floor(v);
+          });
+        }
+        return out;
+      }
+      function normAnswers(raw) {
+        var out = {};
+        if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+          Object.keys(raw).forEach(function (k) {
+            if (typeof raw[k] === "string" && /^\d+$/.test(k)) out[k] = raw[k];
+          });
+        }
+        return out;
+      }
+      function normEntry(e) {
+        if (!e || typeof e !== "object") return null;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(e.date || ""))) return null;
+        var items = [];
+        if (Array.isArray(e.items)) {
+          e.items.forEach(function (n) {
+            if (typeof n === "number" && n >= 1 && n <= 12 && items.indexOf(n) < 0) items.push(n);
+          });
+          items.sort(function (a, b) { return a - b; });
+        }
+        return {
+          date: String(e.date),
+          items: items,
+          huangCount: typeof e.huangCount === "number" && isFinite(e.huangCount) ? e.huangCount : null,
+          baoCount: typeof e.baoCount === "number" && isFinite(e.baoCount) ? e.baoCount : null,
+          classics: normClassics(e.classics),
+          sitting: normSitting(e.sitting),
+          reflectionAnswers: normAnswers(e.reflectionAnswers),
+          reflectionNote: typeof e.reflectionNote === "string" ? e.reflectionNote : "",
+          note: typeof e.note === "string" ? e.note : "",
+        };
+      }
+      function normProfile(p) {
+        var d = defaultProfile();
+        if (!p || typeof p !== "object") return d;
+        return {
+          temple: typeof p.temple === "string" ? p.temple : "",
+          name: typeof p.name === "string" ? p.name : "",
+          daoName: typeof p.daoName === "string" ? p.daoName : "",
+          baoUnit: p.baoUnit === "sheng" ? "sheng" : "ben",
+          fontSize: typeof p.fontSize === "number" && isFinite(p.fontSize)
+            ? Math.min(4, Math.max(0, Math.floor(p.fontSize))) : 1,
+        };
+      }
+      function normFullState(raw) {
+        var st = defaultState();
+        if (!raw || typeof raw !== "object") return st;
+        st.profile = normProfile(raw.profile);
+        if (Array.isArray(raw.entries)) {
+          raw.entries.forEach(function (e) {
+            var ne = normEntry(e);
+            if (ne) st.entries.push(ne);
+          });
+          st.entries.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+        }
+        if (Array.isArray(raw.reflectionItems)) {
+          raw.reflectionItems.forEach(function (it) {
+            if (it && typeof it === "object" && typeof it.id === "number" && typeof it.label === "string") {
+              st.reflectionItems.push({ id: it.id, label: it.label });
+            }
+          });
+        }
+        return st;
+      }
+
+      var state = defaultState();
+      var storageOk = true;
+
+      function persist() {
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(state));
+        } catch (err) {
+          storageOk = false;
+        }
+      }
+      function loadStore() {
+        try {
+          var raw = localStorage.getItem(STORE_KEY);
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            var st = normFullState(parsed);
+            if (parsed && typeof parsed === "object") {
+              if (parsed.snapshots && typeof parsed.snapshots === "object") st.snapshots = parsed.snapshots;
+              if (typeof parsed.archivedMonth === "string") st.archivedMonth = parsed.archivedMonth;
+            }
+            state = st;
+          }
+        } catch (err) {
+          state = defaultState();
+        }
+      }
+
+      /* ---- GFS snapshots (same slots/semantics as the source) ---- */
+      function snapshotPayload(extra) {
+        var payload = {
+          profile: JSON.parse(JSON.stringify(state.profile)),
+          entries: JSON.parse(JSON.stringify(state.entries)),
+          reflectionItems: JSON.parse(JSON.stringify(state.reflectionItems)),
+        };
+        if (extra) Object.keys(extra).forEach(function (k) { payload[k] = extra[k]; });
+        return payload;
+      }
+      function writeSnapshot(slot, extra) {
+        state.snapshots[slot] = {
+          payload: JSON.stringify(snapshotPayload(extra)),
+          takenAt: Date.now(),
+          entryCount: state.entries.length,
+        };
+      }
+      // Run before every mutating save: latest-undo always captures the
+      // pre-save state; on the first save touching a new day,
+      // today-initial and yesterday capture the state as the day began.
+      function snapshotBeforeSave(todayIso) {
+        writeSnapshot("latest-undo");
+        var hasToday = state.entries.some(function (e) { return e.date === todayIso; });
+        if (!hasToday) {
+          writeSnapshot("today-initial");
+          writeSnapshot("yesterday");
+        }
+      }
+      // Monthly archive: the source space used a scheduled job on the
+      // 1st; a single-file app has no scheduler, so the archive is
+      // taken the first time the app is opened in a new month.
+      // Idempotent per month.
+      function lazyMonthlyArchive() {
+        var t = todayLocal();
+        var prev = new Date(t.y, t.m - 2, 1);
+        var prevKey = prev.getFullYear() + "-" + pad(prev.getMonth() + 1);
+        if (state.archivedMonth === prevKey) return;
+        if (state.entries.length === 0) { state.archivedMonth = prevKey; persist(); return; }
+        writeSnapshot("last-month", { archivedMonth: prevKey });
+        state.archivedMonth = prevKey;
+        persist();
+      }
+
+      function entryTotal(e, baoUnit) {
+        if (e.huangCount === null && e.baoCount === null) return null;
+        var a = e.huangCount || 0, b = e.baoCount || 0;
+        return baoUnit === "ben" ? a + b * 1000 : a + b;
+      }
+      function monthEntries(y, m) {
+        var prefix = y + "-" + pad(m) + "-";
+        return state.entries.filter(function (e) { return e.date.indexOf(prefix) === 0; });
+      }
+      function entryByDate(iso) {
+        for (var i = 0; i < state.entries.length; i++) {
+          if (state.entries[i].date === iso) return state.entries[i];
+        }
+        return undefined;
+      }
+      function currentStreak(todayIso) {
+        var filled = {};
+        state.entries.forEach(function (e) { filled[e.date] = true; });
+        var p = parseIso(todayIso);
+        var cursor = new Date(p.y, p.m - 1, p.d);
+        if (!filled[todayIso]) cursor.setDate(cursor.getDate() - 1);
+        var streak = 0;
+        for (;;) {
+          var iso = isoOf(cursor.getFullYear(), cursor.getMonth() + 1, cursor.getDate());
+          if (!filled[iso]) break;
+          streak += 1;
+          cursor.setDate(cursor.getDate() - 1);
+        }
+        return streak;
+      }
+
+      /* ------------------------------------------------------------
+         Faithful paper card — used for the on-screen preview and the
+         browser-print output. Fixed px sizes: it never follows the
+         字體大小 setting, exactly like the paper form.
+         ------------------------------------------------------------ */
+      var CARD_INSTRUCTIONS = [
+        "1. 填寫奮鬥卡，是天帝教教徒同奮每日應奉行的基本功課。",
+        "2. 本卡請按日填寫，並於次月 5 日以前，送交所屬教院、教堂彙呈光殿（郵寄、傳真或 E-mail 皆可）。",
+        "3. 奮鬥事蹟如在「奮鬥參考項目」範圍內，只填寫其「項次」；如不在其範圍內，則填寫其簡要事蹟。",
+        "4. 如尚有不明瞭，請參考填寫須知。",
+      ];
+
+      function mottoHtml(text) {
+        var spans = text.split("").map(function (c) { return "<span>" + esc(c) + "</span>"; }).join("");
+        return '<div class="pc-motto" aria-hidden="true">' + spans + "</div>";
+      }
+      function itemSizeClass(n) {
+        return n <= 2 ? "f0" : n <= 4 ? "f1" : n <= 6 ? "f2" : "f3";
+      }
+      function bandDaysList() {
+        var b0 = [], b1 = [], b2 = [], i;
+        for (i = 1; i <= 10; i++) b0.push(i);
+        for (i = 11; i <= 21; i++) b1.push(i);
+        for (i = 22; i <= 31; i++) b2.push(i);
+        b2.push(null);
+        return [b0, b1, b2];
+      }
+
+      function printCardHtml(y, m) {
+        var profile = state.profile;
+        var list = monthEntries(y, m);
+        var sumA = list.reduce(function (s, e) { return s + (e.huangCount || 0); }, 0);
+        var sumB = list.reduce(function (s, e) { return s + (e.baoCount || 0); }, 0);
+        var total = profile.baoUnit === "ben" ? sumA + sumB * 1000 : sumA + sumB;
+
+        var bandsHtml = "";
+        bandDaysList().forEach(function (days, b) {
+          var heads = (b === 0 ? '<td class="pc-dh">日</td>' : "") + days.map(function (d) {
+            return '<td class="pc-dh">' + (d === null ? "" : d) + "</td>";
+          }).join("");
+          var label = b === 0
+            ? '<td class="pc-vv"><div class="pc-lab"><span>奮</span><span>鬥</span><span>記</span><span>錄</span></div></td>'
+            : "";
+          var vals = days.map(function (d) {
+            if (d === null) return '<td class="pc-vv"></td>';
+            var e = entryByDate(isoOf(y, m, d));
+            var inner = "";
+            if (e && e.items.length > 0) {
+              inner += '<div class="pc-items ' + itemSizeClass(e.items.length) + '">' +
+                e.items.map(function (n) { return "<div>" + n + "</div>"; }).join("") + "</div>";
+            }
+            if (e && e.note) inner += '<div class="pc-note">' + esc(e.note) + "</div>";
+            return '<td class="pc-vv">' + inner + "</td>";
+          }).join("");
+          bandsHtml += "<tbody><tr>" + heads + "</tr><tr>" + label + vals + "</tr></tbody>";
+        });
+
+        var itemsHtml = ITEMS.map(function (it) { return "<p>" + it.n + ". " + esc(it.name) + "</p>"; }).join("");
+        var notesHtml = CARD_INSTRUCTIONS.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("");
+        var totalNote = profile.baoUnit === "ben"
+          ? "（皇誥 " + fmtNum(sumA) + " 聲 ＋ 寶誥 " + fmtNum(sumB) + " 本 × 1000 = " + fmtNum(sumB * 1000) + "）"
+          : "（皇誥 " + fmtNum(sumA) + " 聲 ＋ 寶誥 " + fmtNum(sumB) + " 聲）";
+
+        return '<div class="print-card"><div class="pc-flex">' +
+          mottoHtml("勿以惡小而為之") +
+          '<div class="pc-left">' +
+            '<p class="pc-title">天帝教同奮 ' + y + "年" + m + "月奮鬥卡</p>" +
+            '<table class="pc-table"><tbody><tr>' +
+              '<td class="pc-who"><div class="pc-lab2"><div>姓</div><div>名</div></div></td>' +
+              '<td class="pc-who pc-val" colspan="2">' + esc(profile.name) + "</td>" +
+              '<td class="pc-who"><div class="pc-lab2"><div>道</div><div>名</div></div></td>' +
+              '<td class="pc-who pc-val" colspan="2">' + esc(profile.daoName) + "</td>" +
+              '<td class="pc-who" colspan="2"><div class="pc-lab2"><div>所屬</div><div>教院</div></div></td>' +
+              '<td class="pc-who pc-temple" colspan="3">' + esc(profile.temple) + "</td>" +
+            "</tr></tbody>" + bandsHtml + "</table>" +
+            '<p class="pc-total"><span>皇誥</span><span>＋寶誥</span><span>本 ＝ <b>' + fmtNum(total) + '</b></span><span class="sub">' + totalNote + "</span></p>" +
+          "</div>" +
+          mottoHtml("勿以善小而不為") +
+          mottoHtml("不求個人福報") +
+          '<div class="pc-right">' +
+            '<p class="pc-rt">奮鬥參考項目</p>' +
+            '<div class="pc-ritems">' + itemsHtml + "</div>" +
+            '<div class="pc-rsec"><p class="pc-rt">填卡說明</p><div class="pc-rnotes">' + notesHtml + "</div></div>" +
+          "</div>" +
+          mottoHtml("不為自己打算") +
+          "</div></div>";
+      }
+
+      /* ------------------------------------------------------------
+         Standalone print document — serialized self-contained HTML
+         (all styles inline) that can be opened in a new top-level tab
+         (where printing works) or downloaded and printed later.
+         ------------------------------------------------------------ */
+      function buildPrintHtml(y, m) {
+        var profile = state.profile;
+        var list = monthEntries(y, m);
+        var sumA = list.reduce(function (s, e) { return s + (e.huangCount || 0); }, 0);
+        var sumB = list.reduce(function (s, e) { return s + (e.baoCount || 0); }, 0);
+        var total = profile.baoUnit === "ben" ? sumA + sumB * 1000 : sumA + sumB;
+        var fmt = fmtNum;
+        var fClass = itemSizeClass;
+        var motto = function (t) {
+          return '<div class="motto">' + t.split("").map(function (c) { return "<span>" + esc(c) + "</span>"; }).join("") + "</div>";
+        };
+        var bandsHtml = "";
+        bandDaysList().forEach(function (days, b) {
+          var heads = (b === 0 ? '<td class="dh">日</td>' : "") + days.map(function (d) {
+            return '<td class="dh">' + (d === null ? "" : d) + "</td>";
+          }).join("");
+          var label = b === 0
+            ? '<td class="vv"><div class="lab"><span>奮</span><span>鬥</span><span>記</span><span>錄</span></div></td>'
+            : "";
+          var vals = days.map(function (d) {
+            if (d === null) return '<td class="vv"></td>';
+            var e = entryByDate(isoOf(y, m, d));
+            var items = e && e.items.length > 0
+              ? '<div class="items ' + fClass(e.items.length) + '">' + e.items.map(function (n) { return "<div>" + n + "</div>"; }).join("") + "</div>"
+              : "";
+            var note = e && e.note ? '<div class="note">' + esc(e.note) + "</div>" : "";
+            return '<td class="vv">' + items + note + "</td>";
+          }).join("");
+          bandsHtml += "<tr>" + heads + "</tr><tr>" + label + vals + "</tr>";
+        });
+        var itemsHtml = ITEMS.map(function (it) { return "<p>" + it.n + ". " + esc(it.name) + "</p>"; }).join("");
+        var notesHtml = CARD_INSTRUCTIONS.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("");
+        var totalNote = profile.baoUnit === "ben"
+          ? "（皇誥 " + fmt(sumA) + " 聲 ＋ 寶誥 " + fmt(sumB) + " 本 × 1000 = " + fmt(sumB * 1000) + "）"
+          : "（皇誥 " + fmt(sumA) + " 聲 ＋ 寶誥 " + fmt(sumB) + " 聲）";
+
+        var lines = [
+          "<!doctype html>",
+          '<html lang="zh-Hant">',
+          "<head>",
+          '<meta charset="utf-8" />',
+          '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+          "<title>天帝教同奮 " + y + "年" + m + "月奮鬥卡</title>",
+          "<style>",
+          "  @page { size: A4 landscape; margin: 8mm; }",
+          "  * { box-sizing: border-box; }",
+          '  body { margin: 0; background: #fff; color: #000; font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; }',
+          "  .card { display: flex; align-items: stretch; gap: 8px; }",
+          "  .motto { display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 0 2px; font-size: 19px; font-weight: 700; }",
+          "  .left { flex: 1.12 1 0%; min-width: 0; }",
+          "  .right { flex: 1 1 0%; min-width: 0; border: 2px solid #171717; }",
+          "  h1 { text-align: center; font-size: 19px; font-weight: 900; letter-spacing: 0.08em; margin: 0 0 6px; }",
+          "  table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid #171717; }",
+          "  td { border: 1px solid #262626; text-align: center; vertical-align: middle; padding: 0; }",
+          "  td.who { height: 52px; }",
+          "  .lab2 { font-size: 15px; line-height: 1.15; }",
+          "  .val { font-size: 20px; font-weight: 700; }",
+          "  .temple { font-size: 17px; }",
+          "  td.dh { height: 28px; font-size: 16px; font-weight: 700; }",
+          "  td.vv { height: 148px; vertical-align: top; }",
+          "  .items { font-weight: 700; text-align: center; padding-top: 6px; }",
+          "  .items.f0 { font-size: 19px; line-height: 1.9; }",
+          "  .items.f1 { font-size: 17px; line-height: 1.55; }",
+          "  .items.f2 { font-size: 15px; line-height: 1.4; }",
+          "  .items.f3 { font-size: 13px; line-height: 1.3; }",
+          "  .note { padding: 4px 2px 0; text-align: center; font-size: 10px; line-height: 1.25; word-break: break-all; }",
+          "  .lab { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; font-size: 15px; font-weight: 700; }",
+          "  .total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; font-size: 15px; margin: 6px 0 0; }",
+          "  .total .sub { font-size: 11px; color: #525252; }",
+          "  .rt { text-align: center; font-size: 17px; font-weight: 700; letter-spacing: 0.35em; margin: 0; padding: 8px 0 0; }",
+          "  .ritems { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; padding: 6px 12px 10px; font-size: 13px; line-height: 1.9; }",
+          "  .ritems p { margin: 0; text-align: left; }",
+          "  .rsec { border-top: 2px solid #171717; padding-bottom: 8px; }",
+          "  .rnotes { padding: 6px 12px 0; font-size: 12px; line-height: 1.75; }",
+          "  .rnotes p { margin: 0 0 2px; text-align: left; }",
+          "  @media print { body { margin: 0; } }",
+          "</style>",
+          "</head>",
+          "<body>",
+          '<div class="card">',
+          "  " + motto("勿以惡小而為之"),
+          '  <div class="left">',
+          "    <h1>天帝教同奮 " + y + "年" + m + "月奮鬥卡</h1>",
+          "    <table><tbody>",
+          "      <tr>",
+          '        <td class="who"><div class="lab2"><div>姓</div><div>名</div></div></td>',
+          '        <td class="who val" colspan="2">' + esc(profile.name) + "</td>",
+          '        <td class="who"><div class="lab2"><div>道</div><div>名</div></div></td>',
+          '        <td class="who val" colspan="2">' + esc(profile.daoName) + "</td>",
+          '        <td class="who" colspan="2"><div class="lab2"><div>所屬</div><div>教院</div></div></td>',
+          '        <td class="who temple" colspan="3">' + esc(profile.temple) + "</td>",
+          "      </tr>",
+          "      " + bandsHtml,
+          "    </tbody></table>",
+          '    <p class="total"><span>皇誥</span><span>＋寶誥</span><span>本 ＝ <b>' + fmt(total) + '</b></span><span class="sub">' + totalNote + "</span></p>",
+          "  </div>",
+          "  " + motto("勿以善小而不為"),
+          "  " + motto("不求個人福報"),
+          '  <div class="right">',
+          '    <p class="rt">奮鬥參考項目</p>',
+          '    <div class="ritems">' + itemsHtml + "</div>",
+          '    <div class="rsec">',
+          '      <p class="rt">填卡說明</p>',
+          '      <div class="rnotes">' + notesHtml + "</div>",
+          "    </div>",
+          "  </div>",
+          "  " + motto("不為自己打算"),
+          "</div>",
+          "<scr" + "ipt>",
+          '  window.addEventListener("load", function () {',
+          "    setTimeout(function () { window.print(); }, 400);",
+          "  });",
+          "<\/scr" + "ipt>",
+          "</body>",
+          "</html>",
+        ];
+        return lines.join("\n");
+      }
+
+      function downloadBlob(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      }
+      function openPrintDocument(y, m) {
+        var blob = new Blob([buildPrintHtml(y, m)], { type: "text/html;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      }
+      function downloadPrintDocument(y, m) {
+        var blob = new Blob([buildPrintHtml(y, m)], { type: "text/html;charset=utf-8" });
+        downloadBlob(blob, "奮鬥卡-" + y + "年" + pad(m) + "月.html");
+      }
+
+      /* ------------------------------------------------------------
+         Views
+         ------------------------------------------------------------ */
+      var ui = {
+        view: "calendar",           // calendar | report | settings
+        calMode: "month",           // month | day
+        viewY: 0, viewM: 0,
+        reportY: 0, reportM: 0,
+        printPreview: false,
+        profileSaved: false,
+        settingsError: null,
+        confirmSlot: null,
+        confirmReflRemove: null,
+      };
+
+      function entryBadgesHtml(e, baoUnit) {
+        if (!e) return '<span class="badges"></span>';
+        var total = entryTotal(e, baoUnit);
+        var h = '<span class="badges">';
+        if (e.items.indexOf(4) >= 0) h += '<span class="dot green" aria-label="有煉心靜坐"></span>';
+        if (e.huangCount !== null || e.baoCount !== null) h += '<span class="dot gold" aria-label="有持誦兩誥"></span>';
+        if (total !== null) h += '<span class="total">' + fmtNum(total) + "</span>";
+        return h + "</span>";
+      }
+
+      function monthGridHtml(y, m, todayIso, baoUnit) {
+        var firstDow = new Date(y, m - 1, 1).getDay();
+        var count = daysInMonth(y, m);
+        var cells = [];
+        var i;
+        for (i = 0; i < firstDow; i++) cells.push(null);
+        for (i = 1; i <= count; i++) cells.push(i);
+        while (cells.length % 7 !== 0) cells.push(null);
+
+        var h = '<div class="dow">' + WEEKDAYS.map(function (w) { return "<div>" + w + "</div>"; }).join("") + "</div>";
+        h += '<div class="grid">';
+        cells.forEach(function (day, idx) {
+          if (day === null) { h += '<div key="x-' + idx + '"></div>'; return; }
+          var iso = isoOf(y, m, day);
+          var e = entryByDate(iso);
+          var lunar = lunarInfo(y, m, day);
+          var isToday = iso === todayIso;
+          var hasBirthday = birthdayMatchFor(y, m, day) !== null;
+          var cls = "cell" + (e ? " filled" : "") + (isToday ? " today" : "");
+          var aria = m + "月" + day + "日" + (e ? "，已填" : "") + (hasBirthday ? "，有仙佛聖誕" : "");
+          h += '<button type="button" class="' + cls + '" data-act="pick" data-date="' + iso + '" aria-label="' + aria + '">';
+          h += '<span class="dnum">' + day + "</span>";
+          h += '<span class="lunar">' + esc(lunar.shortLabel) + "</span>";
+          h += entryBadgesHtml(e, baoUnit);
+          if (hasBirthday) h += '<span class="shou" aria-label="有仙佛聖誕">壽</span>';
+          if (e && e.items.length > 0) h += '<span class="items-line">' + e.items.join("·") + "</span>";
+          h += "</button>";
+        });
+        h += "</div>";
+        return h;
+      }
+
+      function dayListHtml(y, m, todayIso, baoUnit) {
+        var count = daysInMonth(y, m);
+        var h = '<div class="daylist">';
+        for (var day = 1; day <= count; day++) {
+          var iso = isoOf(y, m, day);
+          var e = entryByDate(iso);
+          var lunar = lunarInfo(y, m, day);
+          var isToday = iso === todayIso;
+          var hasBirthday = birthdayMatchFor(y, m, day) !== null;
+          var aria = m + "月" + day + "日" + (e ? "，已填" : "") + (hasBirthday ? "，有仙佛聖誕" : "");
+          var summary;
+          if (e) {
+            summary = e.items.length > 0
+              ? e.items.map(function (n) {
+                  var it = ITEMS.filter(function (x) { return x.n === n; })[0];
+                  return it ? it.name : String(n);
+                }).join("、")
+              : (e.note || "（僅誥數／備註）");
+          } else {
+            summary = "尚未填寫";
+          }
+          h += '<button type="button" class="dayrow' + (isToday ? " today" : "") + '" data-act="pick" data-date="' + iso + '" aria-label="' + aria + '">';
+          h += '<span class="d1"><b>' + m + "/" + day + "</b><span>星期" + WEEKDAYS[new Date(y, m - 1, day).getDay()] + "</span></span>";
+          h += '<span class="d2">農曆' + esc(lunar.fullLabel) + "</span>";
+          if (hasBirthday) h += '<span class="shou" aria-label="有仙佛聖誕">壽</span>';
+          h += '<span class="d3">' + esc(summary) + "</span>";
+          h += entryBadgesHtml(e, baoUnit);
+          h += "</button>";
+        }
+        h += "</div>";
+        return h;
+      }
+
+      function calendarViewHtml(t, todayIso) {
+        var y = ui.viewY, m = ui.viewM;
+        var list = monthEntries(y, m);
+        var baoUnit = state.profile.baoUnit;
+        var sumA = list.reduce(function (s, e) { return s + (e.huangCount || 0); }, 0);
+        var sumB = list.reduce(function (s, e) { return s + (e.baoCount || 0); }, 0);
+        var total = baoUnit === "ben" ? sumA + sumB * 1000 : sumA + sumB;
+        var hasCounts = list.some(function (e) { return e.huangCount !== null || e.baoCount !== null; });
+
+        var h = '<section aria-label="日曆檢視">';
+        h += '<div class="cal-tools">';
+        h += '<div class="seg" role="group" aria-label="檢視模式">' +
+          '<button type="button" data-act="calmode" data-mode="month" aria-pressed="' + (ui.calMode === "month") + '">月曆</button>' +
+          '<button type="button" data-act="calmode" data-mode="day" aria-pressed="' + (ui.calMode === "day") + '">逐日</button></div>';
+        h += '<p class="cal-title font-display">' + y + "年" + m + "月</p>";
+        h += '<div class="cal-nav">' +
+          '<button type="button" data-act="shift" data-delta="-1" aria-label="上個月">←</button>' +
+          '<button type="button" data-act="thismonth" aria-label="回到本月">本月</button>' +
+          '<button type="button" data-act="shift" data-delta="1" aria-label="下個月">→</button></div>';
+        h += "</div>";
+        h += '<div style="margin-top:0.75rem">' +
+          (ui.calMode === "month" ? monthGridHtml(y, m, todayIso, baoUnit) : dayListHtml(y, m, todayIso, baoUnit)) +
+          "</div>";
+        h += '<p class="cal-foot">' + y + "年" + m + "月：已填 " + list.length + " 天";
+        if (hasCounts) {
+          h += " · 皇誥 " + fmtNum(sumA) + " · 寶誥 " + fmtNum(sumB) + (baoUnit === "ben" ? " 本" : " 聲") + " · 合計 " + fmtNum(total);
+        }
+        h += "</p>";
+        h += '<p class="cal-legend">綠點：有煉心靜坐 · 金點：有持誦兩誥 · 紅「壽」字：仙佛聖誕 · 金字：當日誥數合計</p>';
+        h += "</section>";
+        return h;
+      }
+
+      function reportViewHtml() {
+        var y = ui.reportY, m = ui.reportM;
+        var list = monthEntries(y, m);
+        var baoUnit = state.profile.baoUnit;
+        var sumA = list.reduce(function (s, e) { return s + (e.huangCount || 0); }, 0);
+        var sumB = list.reduce(function (s, e) { return s + (e.baoCount || 0); }, 0);
+        var total = baoUnit === "ben" ? sumA + sumB * 1000 : sumA + sumB;
+        var classicTotals = CLASSICS.map(function (_, i) {
+          return list.reduce(function (s, e) { return s + (e.classics[i] || 0); }, 0);
+        });
+        var sittingTotalMin = list.reduce(function (s, e) {
+          return s + e.sitting.reduce(function (a, v) { return a + (v || 0); }, 0);
+        }, 0);
+        var sittingDays = list.filter(function (e) {
+          return e.sitting.some(function (v) { return v !== null && v > 0; });
+        }).length;
+
+        var years = "";
+        for (var yy = 2024; yy <= 2032; yy++) {
+          years += '<option value="' + yy + '"' + (yy === y ? " selected" : "") + ">" + yy + "</option>";
+        }
+        var months = "";
+        for (var mm = 1; mm <= 12; mm++) {
+          months += '<option value="' + mm + '"' + (mm === m ? " selected" : "") + ">" + mm + "月</option>";
+        }
+
+        var stats = [
+          { label: "已填天數", value: list.length + " 天" },
+          { label: "皇誥總數", value: fmtCount(list.some(function (e) { return e.huangCount !== null; }) ? sumA : null) },
+          { label: "寶誥總數（" + (baoUnit === "ben" ? "本" : "聲") + "）", value: fmtCount(list.some(function (e) { return e.baoCount !== null; }) ? sumB : null) },
+          { label: "誥數總計", value: fmtNum(total) },
+        ];
+
+        var h = '<section aria-label="月報表">';
+        h += '<div class="report-tools">' +
+          '<label for="report-year">年份</label>' +
+          '<select id="report-year" aria-label="報表年份" data-change="report-year">' + years + "</select>" +
+          '<label for="report-month">月份</label>' +
+          '<select id="report-month" aria-label="報表月份" data-change="report-month">' + months + "</select>" +
+          '<button type="button" class="btn-accent" data-act="print-preview">列印／儲存 PDF</button></div>';
+
+        h += '<div class="stat-grid">' + stats.map(function (s) {
+          return '<div class="stat"><p class="sl">' + esc(s.label) + '</p><p class="sv font-display">' + esc(s.value) + "</p></div>";
+        }).join("") + "</div>";
+
+        h += '<div class="tally"><p class="title">經典誦持（本月合計）</p><div class="tally-grid">' +
+          CLASSICS.map(function (name, i) {
+            return "<p><span>" + esc(name) + "</span><b>" + fmtNum(classicTotals[i] || 0) + " 遍</b></p>";
+          }).join("") + "</div>" +
+          '<p class="sit-line">靜坐：本月合計 <b>' + fmtNum(sittingTotalMin) + "</b> 分鐘 · 有靜坐天數 <b>" + sittingDays + "</b> 天</p></div>";
+
+        h += '<div class="tally"><p class="title">各項目落實天數</p><div class="tally-grid">' +
+          ITEMS.map(function (it) {
+            var c = list.filter(function (e) { return e.items.indexOf(it.n) >= 0; }).length;
+            return "<p><span>" + it.n + ". " + esc(it.name) + "</span><b>" + c + " 天</b></p>";
+          }).join("") + "</div></div>";
+
+        h += '<p class="report-note">下方為擬真實體卡預覽。按上方「列印／儲存 PDF」會開啟列印版頁面，再從該頁開啟或下載列印版檔案列印（橫式 A4）。</p>';
+        h += '<div class="card-scroll"><div>' + printCardHtml(y, m) + "</div></div>";
+        h += "</section>";
+        return h;
+      }
+
+      function printPreviewHtml() {
+        var y = ui.reportY, m = ui.reportM;
+        var h = '<div class="screen-only" style="margin:0 auto;width:100%;max-width:64rem;padding:0 1rem 1.5rem">';
+        h += '<div class="pp-tools">' +
+          '<button type="button" class="btn-ghost" data-act="print-back" style="font-weight:600">← 返回月報表</button>' +
+          '<p class="pp-title font-display">' + y + "年" + m + "月奮鬥卡・列印版</p></div>";
+        h += '<p class="pp-desc">在 App 內直接按列印可能不會有反應，請用下面任一方式：「在新頁開啟列印版」會另開一頁並自動跳出列印視窗，可直接列印或存成 PDF；「下載列印版檔案」會把同一份檔案存下來，之後打開就能列印。也可以留在這一頁，用瀏覽器或裝置自己的「列印」功能——印出來的只會是下面這張卡。</p>';
+        h += '<div class="pp-actions">' +
+          '<button type="button" class="btn-accent" data-act="print-open">在新頁開啟列印版</button>' +
+          '<button type="button" class="btn-outline-accent" data-act="print-download">下載列印版檔案</button>' +
+          '<button type="button" class="btn-ghost-lg" data-act="print-window">以瀏覽器列印本頁</button></div>';
+        h += "</div>";
+        h += '<div class="pp-cardwrap"><div>' + printCardHtml(y, m) + "</div></div>";
+        return h;
+      }
+
+      var SLOT_LABELS = {
+        "today-initial": "當日初始快照",
+        "yesterday": "昨日最終快照",
+        "last-month": "上月封存快照",
+        "latest-undo": "最近儲存前快照（復原用）",
+      };
+
+      function settingsHtml() {
+        var p = state.profile;
+        var level = Math.min(FONT_LEVELS.length - 1, Math.max(0, p.fontSize));
+        var order = ["today-initial", "yesterday", "last-month", "latest-undo"];
+        var snapRows = Object.keys(state.snapshots)
+          .map(function (slot) {
+            var s = state.snapshots[slot];
+            return { slot: slot, takenAt: s.takenAt, entryCount: s.entryCount };
+          })
+          .sort(function (a, b) { return order.indexOf(a.slot) - order.indexOf(b.slot); });
+
+        var h = '<section aria-label="設定" class="stack">';
+
+        /* 個人資料 */
+        h += '<div class="card"><h2 class="font-display">個人資料</h2><div class="profile-grid">';
+        var fields = [
+          { key: "temple", label: "所屬教院／教堂", ph: "例：天實堂" },
+          { key: "name", label: "姓名", ph: "" },
+          { key: "daoName", label: "道名", ph: "" },
+        ];
+        fields.forEach(function (f) {
+          h += '<div class="field"><label for="pf-' + f.key + '">' + f.label + "</label>" +
+            '<input id="pf-' + f.key + '" data-profile="' + f.key + '" aria-label="' + f.label + '" value="' + esc(p[f.key]) + '" placeholder="' + f.ph + '" /></div>';
+        });
+        h += "</div>";
+        h += '<fieldset style="margin-top:1rem"><legend>寶誥計算單位</legend><div class="radio-col">' +
+          '<label class="radio-row"><input type="radio" name="bao-unit" value="ben" aria-label="寶誥以本計"' + (p.baoUnit === "ben" ? " checked" : "") + ' /><span>以「本」計 — 誥數總計 ＝ 皇誥（聲）＋ 寶誥（本）× 1000</span></label>' +
+          '<label class="radio-row"><input type="radio" name="bao-unit" value="sheng" aria-label="寶誥以聲計"' + (p.baoUnit === "sheng" ? " checked" : "") + ' /><span>以「聲」計 — 誥數總計 ＝ 皇誥（聲）＋ 寶誥（聲）</span></label>' +
+          "</div></fieldset>";
+        h += '<div style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem">' +
+          '<button type="button" class="btn-accent" data-act="profile-save" style="padding:0.625rem 1.25rem">儲存設定</button>' +
+          (ui.profileSaved ? '<span class="saved-note">已儲存</span>' : "") + "</div>";
+        h += "</div>";
+
+        /* 字體大小 */
+        h += '<div class="card"><h2 class="font-display">字體大小</h2>' +
+          '<div class="font-row">' +
+          '<button type="button" class="font-btn" data-act="font-dec" aria-label="字體變小"' + (level <= 0 ? " disabled" : "") + ">−</button>" +
+          '<p class="font-cur" aria-live="polite"><b>' + FONT_LEVELS[level].label + "</b><span>" + FONT_LEVELS[level].pct + "%</span></p>" +
+          '<button type="button" class="font-btn" data-act="font-inc" aria-label="字體變大"' + (level >= FONT_LEVELS.length - 1 ? " disabled" : "") + ">＋</button>" +
+          "</div>" +
+          '<p class="hint">按 − 或 ＋ 調整，整個畫面的文字會一起變小或變大，設定會自動記住。</p></div>';
+
+        /* 固定反省項目 */
+        h += '<div class="card"><h2 class="font-display">固定反省項目</h2>' +
+          '<p class="hint">在這裡新增、改名或刪除固定反省項目；每個項目會出現在每天登錄畫面的「察覺反省筆記」一節，附一個簡短作答欄。</p>';
+        if (state.reflectionItems.length > 0) {
+          h += '<ul class="refl-list">';
+          state.reflectionItems.forEach(function (it) {
+            h += '<li><input id="refl-' + it.id + '" aria-label="反省項目名稱：' + esc(it.label) + '" value="' + esc(it.label) + '" />' +
+              '<button type="button" class="btn-sm" data-act="refl-rename" data-id="' + it.id + '">改名</button>';
+            if (ui.confirmReflRemove === it.id) {
+              h += '<button type="button" class="btn-danger-sm" data-act="refl-del-confirm" data-id="' + it.id + '">確認刪除？</button>' +
+                '<button type="button" class="btn-sm" data-act="refl-del-cancel" style="color:var(--dim)">取消</button>';
+            } else {
+              h += '<button type="button" class="btn-sm" data-act="refl-del-ask" data-id="' + it.id + '" aria-label="刪除反省項目 ' + esc(it.label) + '" style="color:var(--dim)">刪除</button>';
+            }
+            h += "</li>";
+          });
+          h += "</ul>";
+        } else {
+          h += '<p class="hint" style="margin-top:0.5rem">尚無固定反省項目。</p>';
+        }
+        h += '<div class="add-row"><input id="refl-new" aria-label="新反省項目名稱" placeholder="例：今日言行有無虧欠" />' +
+          '<button type="button" class="btn-add" data-act="refl-add">新增項目</button></div></div>';
+
+        /* 資料備份 */
+        h += '<div class="card"><h2 class="font-display">資料備份</h2>' +
+          '<div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem">' +
+          '<button type="button" class="btn-ghost" data-act="export" style="padding:0.625rem 1rem;font-size:1rem">匯出備份（JSON）</button>' +
+          '<button type="button" class="btn-ghost" data-act="import" style="padding:0.625rem 1rem;font-size:1rem">匯入備份（JSON）</button>' +
+          '<input id="import-file" type="file" accept="application/json" aria-label="選擇備份檔匯入" style="display:none" />' +
+          "</div>" +
+          '<p class="hint">匯入會以備份內容取代目前全部紀錄；匯入前會自動把現況存入「最近儲存前快照」，可隨時還原。備份檔與新奮鬥卡開發（線上版）通用，可互匯。</p></div>';
+
+        /* 自動快照 */
+        h += '<div class="card"><h2 class="font-display">自動快照</h2>';
+        if (snapRows.length === 0) {
+          h += '<p class="hint" style="margin-top:0.5rem">尚無快照 — 儲存任何一筆紀錄後，系統會自動建立。</p>';
+        } else {
+          h += '<ul class="snap-list">';
+          snapRows.forEach(function (s) {
+            var label = SLOT_LABELS[s.slot] || s.slot;
+            h += '<li><span class="snap-info"><b>' + esc(label) + "</b><span>" +
+              new Date(s.takenAt).toLocaleString("zh-Hant") + " · 共 " + s.entryCount + " 筆紀錄</span></span>";
+            if (ui.confirmSlot === s.slot) {
+              h += '<button type="button" class="btn-danger-sm" data-act="snap-confirm" data-slot="' + esc(s.slot) + '">確認還原？</button>' +
+                '<button type="button" class="btn-sm" data-act="snap-cancel" style="color:var(--dim)">取消</button>';
+            } else {
+              h += '<button type="button" class="btn-sm" data-act="snap-ask" data-slot="' + esc(s.slot) + '" aria-label="還原' + esc(label) + '">還原</button>';
+            }
+            h += "</li>";
+          });
+          h += "</ul>";
+        }
+        h += '<p class="hint">還原前會先把目前狀態存入「最近儲存前快照」，還原錯了可以再換回來。</p></div>';
+
+        /* 仙佛聖誕一覽 */
+        h += '<div class="card"><h2 class="font-display">仙佛聖誕一覽</h2>' +
+          '<p class="hint">依農曆日期排列，資料取自丙午年宣禮應用表（民114.12.10）。閏月不另行祝壽；當月無三十日時，三十日之聖誕提前於廿九日。此表僅供參考，不能修改。</p>';
+        LUNAR_MONTH_NAMES.forEach(function (monthName, mi) {
+          var days = BIRTHDAY_TABLE.filter(function (b) { return b.month === mi + 1; });
+          if (days.length === 0) return;
+          h += '<div class="bday-month"><h3 class="font-display">' + monthName + '</h3><ul>';
+          days.forEach(function (b) {
+            h += '<li><p class="bd-date">' + lunarDateLabel(b.month, b.day) +
+              (b.festival ? "<span>" + esc(b.festival) + "</span>" : "") + "</p>" +
+              '<p class="bd-occ">' + b.occasions.map(function (oc) { return esc(oc.name) + " " + esc(oc.type); }).join("、") + "</p></li>";
+          });
+          h += "</ul></div>";
+        });
+        h += "</div>";
+
+        if (ui.settingsError) h += '<p class="err" role="alert">' + esc(ui.settingsError) + "</p>";
+        h += "</section>";
+        return h;
+      }
+
+      /* ------------------------------------------------------------
+         Daily entry panel + 仙佛聖誕 popup
+         ------------------------------------------------------------ */
+      var panel = null; // { date, existing, items:Set, classics:[], confirmDelete, showBirthdays, error }
+
+      function openPanel(iso) {
+        var existing = entryByDate(iso);
+        panel = {
+          date: iso,
+          existing: existing || null,
+          items: new Set(existing ? existing.items : NEW_DAY_DEFAULTS),
+          classics: existing ? existing.classics.slice() : [0, 0, 0, 0, 0, 0],
+          confirmDelete: false,
+          showBirthdays: false,
+          error: null,
+        };
+        renderOverlay();
+      }
+      function closePanel() {
+        panel = null;
+        renderOverlay();
+      }
+
+      function stepperHtml(id, label, value) {
+        var h = '<div><label for="' + id + '">' + esc(label) + '</label><div class="row">' +
+          '<input id="' + id + '" aria-label="' + esc(label) + '" inputmode="numeric" value="' + esc(value) + '" placeholder="未填" />';
+        [1000, 2000].forEach(function (s) {
+          h += '<button type="button" class="add-btn" data-act="step-add" data-target="' + id + '" data-step="' + s + '" aria-label="' + esc(label) + "加" + s + '">+' + s + "</button>";
+        });
+        h += '<button type="button" class="clear-btn" data-act="step-clear" data-target="' + id + '" aria-label="' + esc(label) + '清空">清空</button>';
+        h += "</div></div>";
+        return h;
+      }
+
+      function panelHtml() {
+        if (!panel) return "";
+        var p = parseIso(panel.date);
+        var lunar = lunarInfo(p.y, p.m, p.d);
+        var weekday = WEEKDAYS[new Date(p.y, p.m - 1, p.d).getDay()];
+        var match = birthdayMatchFor(p.y, p.m, p.d);
+        var ex = panel.existing;
+        var baoUnit = state.profile.baoUnit;
+
+        var h = '<div class="overlay" data-act="overlay-bg" role="dialog" aria-modal="true" aria-label="' + p.m + "月" + p.d + '日功課登錄">';
+        h += '<div class="panel" data-stop="1">';
+        h += '<div class="panel-head"><div><h2 class="font-display">' + p.m + "月" + p.d + "日 星期" + weekday + "</h2>" +
+          '<p class="lunar-line">農曆' + esc(lunar.fullLabel) +
+          (lunar.yearGanzhi ? " · " + lunar.yearGanzhi + "年" + (lunar.monthGanzhi ? " " + lunar.monthGanzhi + "月" : "") : "") +
+          "</p></div>" +
+          '<button type="button" class="close-x" data-act="panel-close" aria-label="關閉">✕</button></div>';
+
+        if (match) {
+          h += '<div class="panel-bday"><button type="button" data-act="bday-open">仙佛聖誕（' + match.occasions.length + "）</button></div>";
+        }
+
+        h += '<div class="panel-body">';
+
+        /* 奮鬥項目 */
+        h += '<fieldset class="first"><legend>奮鬥項目</legend><p class="sub">點選今日落實的項次</p><div class="item-list">';
+        ITEMS.forEach(function (item) {
+          var checked = panel.items.has(item.n);
+          h += '<label class="item-row' + (checked ? " checked" : "") + '">' +
+            '<input type="checkbox" data-item="' + item.n + '" aria-label="第' + item.n + "項 " + esc(item.name) + '"' + (checked ? " checked" : "") + " />" +
+            '<span class="num font-display">' + item.n + '</span><span class="nm">' + esc(item.name) + "</span></label>";
+        });
+        h += "</div></fieldset>";
+
+        /* 簡要事蹟／備註 */
+        h += '<div class="note-field"><label for="day-note">簡要事蹟／備註（12 項以外的善行或心得）</label>' +
+          '<textarea id="day-note" aria-label="簡要事蹟備註" rows="3">' + esc(ex ? ex.note : "") + "</textarea></div>";
+
+        /* 皇寶誥 */
+        h += '<fieldset><legend>皇寶誥</legend><div class="stepper">' +
+          stepperHtml("count-huang", "皇誥數（聲）", ex && ex.huangCount !== null ? String(ex.huangCount) : "") +
+          stepperHtml("count-bao", baoUnit === "ben" ? "寶誥數（本）" : "寶誥數（聲）", ex && ex.baoCount !== null ? String(ex.baoCount) : "") +
+          "</div></fieldset>";
+
+        /* 經典 */
+        h += '<fieldset><legend>經典（遍）</legend><div class="classic-list">';
+        CLASSICS.forEach(function (name, i) {
+          var v = panel.classics[i] || 0;
+          h += '<div class="classic-row"><span class="cname">' + esc(name) + "</span>" +
+            '<button type="button" class="cbtn" data-act="classic-dec" data-i="' + i + '" aria-label="' + esc(name) + '減少一遍"' + (v === 0 ? " disabled" : "") + ">−</button>" +
+            '<span class="cval" id="classic-val-' + i + '" aria-label="' + esc(name) + '遍數">' + v + "</span>" +
+            '<button type="button" class="cbtn plus" data-act="classic-inc" data-i="' + i + '" aria-label="' + esc(name) + '增加一遍">＋</button>' +
+            '<button type="button" class="cclear" data-act="classic-clear" data-i="' + i + '" aria-label="' + esc(name) + '清空"' + (v === 0 ? " disabled" : "") + ">清空</button></div>";
+        });
+        h += '</div><p class="sub">填入遍數會自動勾選第 6 項「持誦基本經典」（可再手動取消）。</p></fieldset>';
+
+        /* 靜坐 */
+        var sitVals = ex ? ex.sitting : [null, null, null, null];
+        var sitTotal = sitVals.reduce(function (s, v) { return s + (v || 0); }, 0);
+        h += '<fieldset><legend>靜坐（分鐘）</legend><div class="sit-row">';
+        sitVals.forEach(function (v, i) {
+          h += '<div class="sit-cell"><label for="sitting-' + i + '">' + (i + 1) + "</label>" +
+            '<input id="sitting-' + i + '" data-sit="' + i + '" aria-label="第' + (i + 1) + '次靜坐分鐘" inputmode="numeric" value="' + (v === null ? "" : v) + '" placeholder="0" /></div>';
+        });
+        h += '<p class="sit-total">合計 <b class="font-display" id="sit-total">' + sitTotal + "</b> 分鐘</p></div>" +
+          '<p class="sub">填入分鐘會自動勾選第 4 項「修持煉心靜坐」（可再手動取消）。</p></fieldset>';
+
+        /* 察覺反省筆記 */
+        h += '<fieldset><legend>察覺反省筆記</legend>';
+        if (state.reflectionItems.length > 0) {
+          h += '<div class="refl-fields">';
+          state.reflectionItems.forEach(function (it) {
+            var ans = ex && ex.reflectionAnswers[String(it.id)] ? ex.reflectionAnswers[String(it.id)] : "";
+            h += '<div><label for="reflect-' + it.id + '">' + esc(it.label) + "</label>" +
+              '<input class="text-input" id="reflect-' + it.id + '" data-refl="' + it.id + '" aria-label="' + esc(it.label) + '" maxlength="500" value="' + esc(ans) + '" /></div>';
+          });
+          h += "</div>";
+        }
+        h += '<div class="note-field"><label for="reflection-note">今日反省筆記</label>' +
+          '<textarea id="reflection-note" aria-label="今日反省筆記" rows="3">' + esc(ex ? ex.reflectionNote : "") + "</textarea></div>";
+        if (state.reflectionItems.length === 0) {
+          h += '<p class="sub">固定反省項目可在「設定」頁新增，會出現在每天的這一節。</p>';
+        }
+        h += "</fieldset>";
+
+        h += "</div>"; // panel-body
+
+        h += '<div class="panel-foot">';
+        if (panel.error) h += '<p class="err" role="alert" style="margin:0 0 0.5rem">' + esc(panel.error) + "</p>";
+        h += '<div class="row"><button type="button" class="btn-accent save" data-act="panel-save">儲存</button>';
+        if (ex) {
+          if (panel.confirmDelete) {
+            h += '<button type="button" class="btn-del-confirm" data-act="panel-del-confirm">確認刪除？</button>';
+          } else {
+            h += '<button type="button" class="btn-del" data-act="panel-del-ask">刪除本日</button>';
+          }
+        }
+        h += "</div></div>";
+        h += "</div>"; // panel
+
+        if (panel.showBirthdays && match) {
+          h += birthdayPopupHtml(lunar.fullLabel, match);
+        }
+        h += "</div>";
+        return h;
+      }
+
+      function birthdayPopupHtml(lunarLabel, match) {
+        var h = '<div class="overlay overlay-bday" data-act="bday-bg" role="dialog" aria-modal="true" aria-label="農曆' + esc(lunarLabel) + '仙佛聖誕">';
+        h += '<div class="bday-panel" data-stop="1">';
+        h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem">' +
+          '<h2 class="font-display">農曆' + esc(lunarLabel) + "</h2>" +
+          '<button type="button" class="close-x" data-act="bday-close" aria-label="關閉仙佛聖誕">✕</button></div>';
+        if (match.festival) h += '<p class="bday-fest">本日亦逢' + esc(match.festival) + "</p>";
+        h += '<ul class="bday-list">';
+        match.occasions.forEach(function (oc) {
+          h += '<li><span class="on">' + esc(oc.name) + '</span><span class="ot">' + esc(oc.type) + "</span></li>";
+        });
+        h += "</ul>";
+        if (match.observedEarly) {
+          h += '<p class="bday-note">本月無三十日，三十日之聖誕提前於本日（廿九日）。</p>';
+        }
+        h += '<button type="button" class="btn-accent bday-close" data-act="bday-close">關閉</button>';
+        h += "</div></div>";
+        return h;
+      }
+
+      function renderOverlay() {
+        document.getElementById("overlay-root").innerHTML = panelHtml();
+        wirePanel();
+      }
+
+      function parseCountInput(s) {
+        var t = String(s == null ? "" : s).trim();
+        if (t === "") return null;
+        var n = Number(t);
+        if (!isFinite(n) || n < 0) return -1;
+        return Math.floor(n);
+      }
+      function el(id) { return document.getElementById(id); }
+
+      function autoCheckItem(n) {
+        if (!panel) return;
+        panel.items.add(n);
+        var cb = document.querySelector('input[data-item="' + n + '"]');
+        if (cb) {
+          cb.checked = true;
+          var row = cb.closest(".item-row");
+          if (row) row.classList.add("checked");
+        }
+      }
+
+      function wirePanel() {
+        if (!panel) return;
+        var root = document.getElementById("overlay-root");
+        root.querySelectorAll("input[data-item]").forEach(function (cb) {
+          cb.addEventListener("change", function () {
+            var n = Number(cb.getAttribute("data-item"));
+            if (cb.checked) panel.items.add(n); else panel.items.delete(n);
+            var row = cb.closest(".item-row");
+            if (row) row.classList.toggle("checked", cb.checked);
+          });
+        });
+        root.querySelectorAll("input[data-sit]").forEach(function (inp) {
+          inp.addEventListener("input", function () {
+            var total = 0;
+            root.querySelectorAll("input[data-sit]").forEach(function (x) {
+              var n = Number(String(x.value).trim());
+              if (String(x.value).trim() !== "" && isFinite(n) && n > 0) total += Math.floor(n);
+            });
+            var t = el("sit-total");
+            if (t) t.textContent = String(total);
+            var n2 = Number(String(inp.value).trim());
+            if (String(inp.value).trim() !== "" && isFinite(n2) && n2 > 0) autoCheckItem(4);
+          });
+        });
+      }
+
+      function savePanel() {
+        if (!panel) return;
+        var h = parseCountInput(el("count-huang").value);
+        var b = parseCountInput(el("count-bao").value);
+        if (h === -1 || b === -1) { panel.error = "誥數請輸入 0 以上的整數"; renderOverlay(); return; }
+        var sit = [];
+        var sitBad = false;
+        for (var i = 0; i < 4; i++) {
+          var v = parseCountInput(el("sitting-" + i).value);
+          if (v === -1) sitBad = true;
+          sit.push(v);
+        }
+        if (sitBad) { panel.error = "靜坐分鐘請輸入 0 以上的整數"; renderOverlay(); return; }
+        var answers = {};
+        state.reflectionItems.forEach(function (it) {
+          var inp = el("reflect-" + it.id);
+          if (inp && inp.value.trim() !== "") answers[String(it.id)] = inp.value;
+        });
+        var reflectionNote = el("reflection-note").value;
+        var note = el("day-note").value;
+        var items = Array.from(panel.items).sort(function (a, c) { return a - c; });
+        var classics = panel.classics.slice();
+
+        snapshotBeforeSave(todayLocal().iso);
+        var isEmpty =
+          items.length === 0 && h === null && b === null &&
+          classics.every(function (n) { return n === 0; }) &&
+          sit.every(function (n) { return n === null; }) &&
+          Object.keys(answers).length === 0 &&
+          reflectionNote.trim() === "" && note.trim() === "";
+        var idx = state.entries.findIndex(function (e) { return e.date === panel.date; });
+        if (isEmpty) {
+          if (idx >= 0) state.entries.splice(idx, 1);
+        } else {
+          var entry = {
+            date: panel.date, items: items, huangCount: h, baoCount: b,
+            classics: classics, sitting: sit, reflectionAnswers: answers,
+            reflectionNote: reflectionNote, note: note,
+          };
+          if (idx >= 0) state.entries[idx] = entry;
+          else {
+            state.entries.push(entry);
+            state.entries.sort(function (a, c) { return a.date < c.date ? -1 : a.date > c.date ? 1 : 0; });
+          }
+        }
+        persist();
+        closePanel();
+        render();
+      }
+
+      function deletePanelEntry() {
+        if (!panel) return;
+        snapshotBeforeSave(todayLocal().iso);
+        var idx = state.entries.findIndex(function (e) { return e.date === panel.date; });
+        if (idx >= 0) state.entries.splice(idx, 1);
+        persist();
+        closePanel();
+        render();
+      }
+
+      /* ------------------------------------------------------------
+         App shell render
+         ------------------------------------------------------------ */
+      function applyFontScale() {
+        var level = Math.min(FONT_LEVELS.length - 1, Math.max(0, state.profile.fontSize));
+        document.documentElement.style.setProperty("--font-scale", String(FONT_LEVELS[level].pct / 100));
+      }
+
+      function render() {
+        applyFontScale();
+        var t = todayLocal();
+        var app = document.getElementById("app");
+        var printRoot = document.getElementById("print-root");
+
+        if (ui.printPreview) {
+          app.innerHTML = '<div style="min-height:100vh">' + printPreviewHtml() + "</div>";
+          printRoot.innerHTML = "";
+          window.scrollTo(0, 0);
+          return;
+        }
+
+        var todayEntry = entryByDate(t.iso);
+        var tl = lunarInfo(t.y, t.m, t.d);
+        var baoUnit = state.profile.baoUnit;
+        var streak = currentStreak(t.iso);
+        var showBanner = t.d >= 1 && t.d <= 5;
+
+        var h = '<div class="wrap screen-only">';
+        if (showBanner) {
+          h += '<div class="banner" role="note">本月 1 至 5 日是呈報期：請核對上個月奮鬥卡，列印呈品牌所屬教院，並匯出一份備份留底。' +
+            '<button type="button" data-act="goto-report">查看上月報表</button></div>';
+        }
+        if (!storageOk) {
+          h += '<div class="banner" role="alert">此裝置無法儲存資料（瀏覽器儲存空間不可用），本次開啟所填的內容在關閉後不會保留。請改用一般瀏覽模式開啟，或匯出備份留底。</div>';
+        }
+
+        /* Today hero */
+        h += '<header class="hero">';
+        h += '<p class="hero-date">' + t.y + "年" + t.m + "月" + t.d + "日 星期" + WEEKDAYS[new Date(t.y, t.m - 1, t.d).getDay()] +
+          " · 農曆" + esc(tl.fullLabel) +
+          (tl.yearGanzhi ? " · " + tl.yearGanzhi + "年" + (tl.monthGanzhi ? " " + tl.monthGanzhi + "月" : "") : "") + "</p>";
+        h += '<div class="hero-row"><h1 class="font-display">今日功課</h1>';
+        if (streak > 0) h += '<p class="streak">連續填卡 <b class="font-display">' + streak + "</b> 天</p>";
+        h += "</div>";
+        h += '<div class="hero-actions">';
+        if (todayEntry) {
+          var names = todayEntry.items.length > 0
+            ? todayEntry.items.map(function (n) {
+                var it = ITEMS.filter(function (x) { return x.n === n; })[0];
+                return it ? it.name : String(n);
+              }).join("、")
+            : "（無勾選項目）";
+          var tot = entryTotal(todayEntry, baoUnit);
+          h += '<span class="hero-summary">今日已填：' + esc(names) + (tot !== null ? " · 誥數合計 " + fmtNum(tot) : "") + "</span>";
+          h += '<button type="button" class="btn-accent-sm" data-act="pick" data-date="' + t.iso + '">修改今日功課</button>';
+        } else {
+          h += '<button type="button" class="btn-accent" data-act="pick" data-date="' + t.iso + '">登錄今日功課</button>';
+        }
+        h += "</div></header>";
+
+        /* Tabs */
+        h += '<nav class="tabs" aria-label="主要檢視">';
+        [["calendar", "日曆"], ["report", "月報表"], ["settings", "設定"]].forEach(function (tab) {
+          h += '<button type="button" data-act="tab" data-view="' + tab[0] + '"' +
+            (ui.view === tab[0] ? ' aria-current="page"' : "") + ">" + tab[1] + "</button>";
+        });
+        h += "</nav>";
+
+        h += "<main>";
+        if (ui.view === "calendar") h += calendarViewHtml(t, t.iso);
+        else if (ui.view === "report") h += reportViewHtml();
+        else if (ui.view === "settings") h += settingsHtml();
+        h += "</main></div>";
+
+        app.innerHTML = h;
+        printRoot.innerHTML = printCardHtml(ui.reportY, ui.reportM);
+        wireMain();
+      }
+
+      function wireMain() {
+        var yr = el("report-year"), rm = el("report-month");
+        if (yr) yr.addEventListener("change", function () { ui.reportY = Number(yr.value); render(); });
+        if (rm) rm.addEventListener("change", function () { ui.reportM = Number(rm.value); render(); });
+        var imp = el("import-file");
+        if (imp) imp.addEventListener("change", function () {
+          var f = imp.files && imp.files[0];
+          if (f) doImportFile(f);
+          imp.value = "";
+        });
+        ["temple", "name", "daoName"].forEach(function (k) {
+          var inp = el("pf-" + k);
+          if (inp) inp.addEventListener("input", function () { ui.profileSaved = false; });
+        });
+      }
+
+      function doExport() {
+        var blob = new Blob([JSON.stringify({
+          profile: state.profile,
+          entries: state.entries,
+          reflectionItems: state.reflectionItems,
+        }, null, 2)], { type: "application/json" });
+        downloadBlob(blob, "fendouka-backup-" + todayLocal().iso + ".json");
+      }
+
+      function doImportFile(file) {
+        file.text().then(function (text) {
+          try {
+            var parsed = JSON.parse(text);
+            if (!parsed || typeof parsed !== "object" || !("profile" in parsed) || !("entries" in parsed) || !Array.isArray(parsed.entries)) {
+              throw new Error("bad");
+            }
+            writeSnapshot("latest-undo");
+            var st = normFullState(parsed);
+            state.profile = st.profile;
+            state.entries = st.entries;
+            state.reflectionItems = st.reflectionItems;
+            persist();
+            ui.settingsError = null;
+            ui.confirmSlot = null;
+            render();
+          } catch (err) {
+            ui.settingsError = "匯入失敗：不是有效的奮鬥卡備份檔";
+            render();
+          }
+        }, function () {
+          ui.settingsError = "匯入失敗：不是有效的奮鬥卡備份檔";
+          render();
+        });
+      }
+
+      /* ------------------------------------------------------------
+         Global click delegation
+         ------------------------------------------------------------ */
+      document.addEventListener("click", function (ev) {
+        var t = ev.target;
+        if (!(t instanceof Element)) return;
+
+        /* Panel / popup layer */
+        if (panel) {
+          var stop = t.closest("[data-stop]");
+          var actEl = t.closest("[data-act]");
+          var act = actEl ? actEl.getAttribute("data-act") : null;
+          if (t.closest(".overlay-bday")) {
+            if (act === "bday-close" || t.classList.contains("overlay-bday")) {
+              panel.showBirthdays = false;
+              renderOverlay();
+            }
+            return;
+          }
+          if (t.classList.contains("overlay")) { closePanel(); render(); return; }
+          if (!stop && !actEl) return;
+          if (actEl && actEl.closest("#overlay-root")) {
+            switch (act) {
+              case "panel-close": closePanel(); render(); return;
+              case "bday-open": panel.showBirthdays = true; renderOverlay(); return;
+              case "panel-save": savePanel(); return;
+              case "panel-del-ask": panel.confirmDelete = true; renderOverlay(); return;
+              case "panel-del-confirm": deletePanelEntry(); return;
+              case "step-add": {
+                var inp = el(actEl.getAttribute("data-target"));
+                var cur = parseCountInput(inp.value);
+                inp.value = String((cur === null || cur === -1 ? 0 : cur) + Number(actEl.getAttribute("data-step")));
+                return;
+              }
+              case "step-clear":
+                el(actEl.getAttribute("data-target")).value = "";
+                return;
+              case "classic-inc": case "classic-dec": case "classic-clear": {
+                var i = Number(actEl.getAttribute("data-i"));
+                if (act === "classic-inc") { panel.classics[i] = (panel.classics[i] || 0) + 1; autoCheckItem(6); }
+                if (act === "classic-dec") panel.classics[i] = Math.max(0, (panel.classics[i] || 0) - 1);
+                if (act === "classic-clear") panel.classics[i] = 0;
+                renderOverlay();
+                return;
+              }
+            }
+            return;
+          }
+          return;
+        }
+
+        var elx = t.closest("[data-act]");
+        if (!elx) return;
+        var a = elx.getAttribute("data-act");
+        var t2 = todayLocal();
+        switch (a) {
+          case "tab":
+            ui.view = elx.getAttribute("data-view");
+            ui.profileSaved = false;
+            ui.settingsError = null;
+            ui.confirmSlot = null;
+            ui.confirmReflRemove = null;
+            render();
+            break;
+          case "goto-report":
+            ui.view = "report";
+            render();
+            break;
+          case "calmode":
+            ui.calMode = elx.getAttribute("data-mode");
+            render();
+            break;
+          case "shift": {
+            var dt = new Date(ui.viewY, ui.viewM - 1 + Number(elx.getAttribute("data-delta")), 1);
+            ui.viewY = dt.getFullYear();
+            ui.viewM = dt.getMonth() + 1;
+            render();
+            break;
+          }
+          case "thismonth":
+            ui.viewY = t2.y; ui.viewM = t2.m;
+            render();
+            break;
+          case "pick":
+            openPanel(elx.getAttribute("data-date"));
+            break;
+          case "print-preview":
+            ui.printPreview = true;
+            render();
+            break;
+          case "print-back":
+            ui.printPreview = false;
+            render();
+            break;
+          case "print-open":
+            openPrintDocument(ui.reportY, ui.reportM);
+            break;
+          case "print-download":
+            downloadPrintDocument(ui.reportY, ui.reportM);
+            break;
+          case "print-window":
+            try { window.print(); } catch (err) { /* no-op in some webviews */ }
+            break;
+          case "profile-save": {
+            state.profile.temple = el("pf-temple").value;
+            state.profile.name = el("pf-name").value;
+            state.profile.daoName = el("pf-daoName").value;
+            var radio = document.querySelector('input[name="bao-unit"]:checked');
+            if (radio) state.profile.baoUnit = radio.value === "sheng" ? "sheng" : "ben";
+            persist();
+            ui.profileSaved = true;
+            render();
+            break;
+          }
+          case "font-dec": case "font-inc": {
+            var lvl = Math.min(4, Math.max(0, state.profile.fontSize + (a === "font-inc" ? 1 : -1)));
+            state.profile.fontSize = lvl;
+            persist();
+            render();
+            break;
+          }
+          case "refl-add": {
+            var inp2 = el("refl-new");
+            var label = inp2.value.trim();
+            if (label === "") break;
+            if (label.length > 100) { ui.settingsError = "反省項目名稱請在 100 字以內"; render(); break; }
+            var maxId = state.reflectionItems.reduce(function (mx, it) { return Math.max(mx, it.id); }, 0);
+            state.reflectionItems.push({ id: maxId + 1, label: label });
+            persist();
+            render();
+            break;
+          }
+          case "refl-rename": {
+            var id = Number(elx.getAttribute("data-id"));
+            var rin = el("refl-" + id);
+            var nl = rin.value.trim();
+            if (nl === "") { ui.settingsError = "反省項目名稱不可空白"; render(); break; }
+            state.reflectionItems.forEach(function (it) { if (it.id === id) it.label = nl; });
+            persist();
+            ui.settingsError = null;
+            render();
+            break;
+          }
+          case "refl-del-ask":
+            ui.confirmReflRemove = Number(elx.getAttribute("data-id"));
+            render();
+            break;
+          case "refl-del-cancel":
+            ui.confirmReflRemove = null;
+            render();
+            break;
+          case "refl-del-confirm": {
+            var did = Number(elx.getAttribute("data-id"));
+            state.reflectionItems = state.reflectionItems.filter(function (it) { return it.id !== did; });
+            ui.confirmReflRemove = null;
+            persist();
+            render();
+            break;
+          }
+          case "export":
+            doExport();
+            break;
+          case "import": {
+            var f = el("import-file");
+            if (f) f.click();
+            break;
+          }
+          case "snap-ask":
+            ui.confirmSlot = elx.getAttribute("data-slot");
+            render();
+            break;
+          case "snap-cancel":
+            ui.confirmSlot = null;
+            render();
+            break;
+          case "snap-confirm": {
+            var slot = elx.getAttribute("data-slot");
+            var snap = state.snapshots[slot];
+            if (snap) {
+              try {
+                var parsed = JSON.parse(snap.payload);
+                writeSnapshot("latest-undo");
+                var st2 = normFullState(parsed);
+                state.profile = st2.profile;
+                state.entries = st2.entries;
+                state.reflectionItems = st2.reflectionItems;
+                persist();
+                ui.settingsError = null;
+              } catch (err) {
+                ui.settingsError = "還原失敗";
+              }
+            }
+            ui.confirmSlot = null;
+            render();
+            break;
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------
+         Init
+         ------------------------------------------------------------ */
+      (function init() {
+        loadStore();
+        lazyMonthlyArchive();
+        var t = todayLocal();
+        ui.viewY = t.y;
+        ui.viewM = t.m;
+        var prev = new Date(t.y, t.m - 2, 1);
+        ui.reportY = prev.getFullYear();
+        ui.reportM = prev.getMonth() + 1;
+        try {
+          localStorage.setItem(STORE_KEY + "__probe", "1");
+          localStorage.removeItem(STORE_KEY + "__probe");
+        } catch (err) {
+          storageOk = false;
+        }
+        render();
+      })();
+    </script>
+  </body>
+</html>
