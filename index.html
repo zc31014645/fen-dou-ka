@@ -470,9 +470,10 @@
          新奮鬥卡 (HTML5 single-file edition)
          Migrated from the 新奮鬥卡開發 space, keeping its look and feel.
          Differences forced by the single-file form: no server — all data
-         is stored on this device (localStorage, one key), and the
-         monthly archive snapshot is taken lazily when the app is first
-         opened in a new month instead of by a scheduled job.
+         is stored on this device (localStorage, one key), and automatic
+         backups are three rolling copies (yesterday / last week / last
+         month) refreshed when a day's entry panel is opened and the
+         copy on hand is older than its interval.
          ================================================================ */
 
       var ITEMS = [
@@ -801,7 +802,8 @@
          Local store — the whole app state under one localStorage key.
          Shape mirrors the source space's state exactly, so JSON
          backups exported from either version import into the other:
-         { profile, entries, reflectionItems } plus snapshot slots.
+         { profile, entries, reflectionItems } plus snapshot slots
+         and the rolling auto-backup copies.
          ------------------------------------------------------------ */
       var STORE_KEY = "xin-fendouka-html5-v1";
 
@@ -809,7 +811,7 @@
         return { temple: "", name: "", daoName: "", baoUnit: "ben", fontSize: 1, defaultItems: NEW_DAY_DEFAULTS.slice() };
       }
       function defaultState() {
-        return { profile: defaultProfile(), entries: [], reflectionItems: [], snapshots: {}, archivedMonth: null };
+        return { profile: defaultProfile(), entries: [], reflectionItems: [], snapshots: {}, autoBackups: {} };
       }
 
       function normClassics(raw) {
@@ -929,7 +931,10 @@
             var st = normFullState(parsed);
             if (parsed && typeof parsed === "object") {
               if (parsed.snapshots && typeof parsed.snapshots === "object") st.snapshots = parsed.snapshots;
-              if (typeof parsed.archivedMonth === "string") st.archivedMonth = parsed.archivedMonth;
+              // The old monthly archive slot is superseded by the
+              // rolling auto-backups; drop it so it stops showing.
+              delete st.snapshots["last-month"];
+              st.autoBackups = normAutoBackups(parsed.autoBackups);
             }
             state = st;
           }
@@ -966,19 +971,71 @@
           writeSnapshot("yesterday");
         }
       }
-      // Monthly archive: the source space used a scheduled job on the
-      // 1st; a single-file app has no scheduler, so the archive is
-      // taken the first time the app is opened in a new month.
-      // Idempotent per month.
-      function lazyMonthlyArchive() {
-        var t = todayLocal();
-        var prev = new Date(t.y, t.m - 2, 1);
-        var prevKey = prev.getFullYear() + "-" + pad(prev.getMonth() + 1);
-        if (state.archivedMonth === prevKey) return;
-        if (state.entries.length === 0) { state.archivedMonth = prevKey; persist(); return; }
-        writeSnapshot("last-month", { archivedMonth: prevKey });
-        state.archivedMonth = prevKey;
-        persist();
+      /* ---- Rolling auto-backups （自動備份） ----
+         Three slots, one copy each; refreshing overwrites the old
+         copy. Each copy is a full copy of all data in the manual
+         export's JSON format, stamped with the date it was taken
+         (backupDate) and the earliest entry date it covers. */
+      var AUTO_BACKUP_SLOTS = [
+        { key: "yesterday", label: "昨日備份", maxAgeMs: 24 * 60 * 60 * 1000 },
+        { key: "lastWeek", label: "上週備份", maxAgeMs: 7 * 24 * 60 * 60 * 1000 },
+        { key: "lastMonth", label: "上月備份", maxAgeMs: 30 * 24 * 60 * 60 * 1000 },
+      ];
+      function autoBackupSlot(key) {
+        for (var i = 0; i < AUTO_BACKUP_SLOTS.length; i++) {
+          if (AUTO_BACKUP_SLOTS[i].key === key) return AUTO_BACKUP_SLOTS[i];
+        }
+        return null;
+      }
+      function normAutoBackups(raw) {
+        var out = {};
+        if (raw && typeof raw === "object") {
+          AUTO_BACKUP_SLOTS.forEach(function (s) {
+            var b = raw[s.key];
+            if (b && typeof b === "object" && typeof b.payload === "string" &&
+                typeof b.takenAt === "number" && isFinite(b.takenAt) &&
+                typeof b.backupDate === "string") {
+              out[s.key] = {
+                payload: b.payload,
+                takenAt: b.takenAt,
+                backupDate: b.backupDate,
+                earliest: typeof b.earliest === "string" ? b.earliest : null,
+              };
+            }
+          });
+        }
+        return out;
+      }
+      function writeAutoBackup(key) {
+        state.autoBackups[key] = {
+          payload: JSON.stringify(snapshotPayload(), null, 2),
+          takenAt: Date.now(),
+          backupDate: todayLocal().iso,
+          earliest: state.entries.length ? state.entries[0].date : null,
+        };
+      }
+      // Checked whenever a day's entry panel opens (a calendar date
+      // cell or a 逐日 row is tapped): a copy older than its interval
+      // — 24 hours / 7 days / 30 days — or not yet taken is replaced
+      // with a fresh copy of the current data and its backup date
+      // moves to the copy date; a copy still fresh is left alone.
+      function checkAutoBackups() {
+        var now = Date.now();
+        var changed = false;
+        AUTO_BACKUP_SLOTS.forEach(function (s) {
+          var b = state.autoBackups[s.key];
+          if (!b || now - b.takenAt > s.maxAgeMs) {
+            writeAutoBackup(s.key);
+            changed = true;
+          }
+        });
+        if (changed) persist();
+      }
+      function autoBackupFilename(slot, b) {
+        var bd = b.backupDate.replace(/-/g, "");
+        return b.earliest
+          ? "奮鬥卡-" + slot.label + "-" + b.earliest.replace(/-/g, "") + "-" + bd + ".json"
+          : "奮鬥卡-" + slot.label + "-" + bd + ".json";
       }
 
       function entryTotal(e, baoUnit) {
@@ -1100,130 +1157,6 @@
           "</div></div>";
       }
 
-      /* ------------------------------------------------------------
-         Standalone print document — serialized self-contained HTML
-         (all styles inline) that can be opened in a new top-level tab
-         (where printing works) or downloaded and printed later.
-         ------------------------------------------------------------ */
-      function buildPrintHtml(y, m) {
-        var profile = state.profile;
-        var list = monthEntries(y, m);
-        var sumA = list.reduce(function (s, e) { return s + (e.huangCount || 0); }, 0);
-        var sumB = list.reduce(function (s, e) { return s + (e.baoCount || 0); }, 0);
-        var total = profile.baoUnit === "ben" ? sumA + sumB * 1000 : sumA + sumB;
-        var fmt = fmtNum;
-        var fClass = itemSizeClass;
-        var motto = function (t) {
-          return '<div class="motto">' + t.split("").map(function (c) { return "<span>" + esc(c) + "</span>"; }).join("") + "</div>";
-        };
-        var bandsHtml = "";
-        bandDaysList().forEach(function (days, b) {
-          var heads = (b === 0 ? '<td class="dh">日</td>' : "") + days.map(function (d) {
-            return '<td class="dh">' + (d === null ? "" : d) + "</td>";
-          }).join("");
-          var label = b === 0
-            ? '<td class="vv"><div class="lab"><span>奮</span><span>鬥</span><span>記</span><span>錄</span></div></td>'
-            : "";
-          var vals = days.map(function (d) {
-            if (d === null) return '<td class="vv"></td>';
-            var e = entryByDate(isoOf(y, m, d));
-            var items = e && e.items.length > 0
-              ? '<div class="items ' + fClass(e.items.length) + '">' + e.items.map(function (n) { return "<div>" + n + "</div>"; }).join("") + "</div>"
-              : "";
-            var note = e && e.note ? '<div class="note">' + esc(e.note) + "</div>" : "";
-            return '<td class="vv">' + items + note + "</td>";
-          }).join("");
-          bandsHtml += "<tr>" + heads + "</tr><tr>" + label + vals + "</tr>";
-        });
-        var itemsHtml = ITEMS.map(function (it) { return "<p>" + it.n + ". " + esc(it.name) + "</p>"; }).join("");
-        var notesHtml = CARD_INSTRUCTIONS.map(function (t) { return "<p>" + esc(t) + "</p>"; }).join("");
-        var totalNote = profile.baoUnit === "ben"
-          ? "（皇誥 " + fmt(sumA) + " 聲 ＋ 寶誥 " + fmt(sumB) + " 本 × 1000 = " + fmt(sumB * 1000) + "）"
-          : "（皇誥 " + fmt(sumA) + " 聲 ＋ 寶誥 " + fmt(sumB) + " 聲）";
-
-        var lines = [
-          "<!doctype html>",
-          '<html lang="zh-Hant">',
-          "<head>",
-          '<meta charset="utf-8" />',
-          '<meta name="viewport" content="width=device-width, initial-scale=1" />',
-          "<title>天帝教同奮 " + y + "年" + m + "月奮鬥卡</title>",
-          "<style>",
-          "  @page { size: A4 landscape; margin: 8mm; }",
-          "  * { box-sizing: border-box; }",
-          '  body { margin: 0; background: #fff; color: #000; font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif; }',
-          "  .card { display: flex; align-items: stretch; gap: 8px; }",
-          "  .motto { display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 0 2px; font-size: 19px; font-weight: 700; }",
-          "  .left { flex: 1.12 1 0%; min-width: 0; }",
-          "  .right { flex: 1 1 0%; min-width: 0; border: 2px solid #171717; }",
-          "  h1 { text-align: center; font-size: 19px; font-weight: 900; letter-spacing: 0.08em; margin: 0 0 6px; }",
-          "  table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 2px solid #171717; }",
-          "  td { border: 1px solid #262626; text-align: center; vertical-align: middle; padding: 0; }",
-          "  td.who { height: 52px; }",
-          "  .lab2 { font-size: 15px; line-height: 1.15; }",
-          "  .val { font-size: 20px; font-weight: 700; }",
-          "  .temple { font-size: 17px; }",
-          "  td.dh { height: 28px; font-size: 16px; font-weight: 700; }",
-          "  td.vv { height: 148px; vertical-align: top; }",
-          "  .items { font-weight: 700; text-align: center; padding-top: 6px; }",
-          "  .items.f0 { font-size: 19px; line-height: 1.9; }",
-          "  .items.f1 { font-size: 17px; line-height: 1.55; }",
-          "  .items.f2 { font-size: 15px; line-height: 1.4; }",
-          "  .items.f3 { font-size: 13px; line-height: 1.3; }",
-          "  .note { padding: 4px 2px 0; text-align: center; font-size: 10px; line-height: 1.25; word-break: break-all; }",
-          "  .lab { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; font-size: 15px; font-weight: 700; }",
-          "  .total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; font-size: 15px; margin: 6px 0 0; }",
-          "  .total .sub { font-size: 11px; color: #525252; }",
-          "  .rt { text-align: center; font-size: 17px; font-weight: 700; letter-spacing: 0.35em; margin: 0; padding: 8px 0 0; }",
-          "  .ritems { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; padding: 6px 12px 10px; font-size: 13px; line-height: 1.9; }",
-          "  .ritems p { margin: 0; text-align: left; }",
-          "  .rsec { border-top: 2px solid #171717; padding-bottom: 8px; }",
-          "  .rnotes { padding: 6px 12px 0; font-size: 12px; line-height: 1.75; }",
-          "  .rnotes p { margin: 0 0 2px; text-align: left; }",
-          "  @media print { body { margin: 0; } }",
-          "</style>",
-          "</head>",
-          "<body>",
-          '<div class="card">',
-          "  " + motto("勿以惡小而為之"),
-          '  <div class="left">',
-          "    <h1>天帝教同奮 " + y + "年" + m + "月奮鬥卡</h1>",
-          "    <table><tbody>",
-          "      <tr>",
-          '        <td class="who"><div class="lab2"><div>姓</div><div>名</div></div></td>',
-          '        <td class="who val" colspan="2">' + esc(profile.name) + "</td>",
-          '        <td class="who"><div class="lab2"><div>道</div><div>名</div></div></td>',
-          '        <td class="who val" colspan="2">' + esc(profile.daoName) + "</td>",
-          '        <td class="who" colspan="2"><div class="lab2"><div>所屬</div><div>教院</div></div></td>',
-          '        <td class="who temple" colspan="3">' + esc(profile.temple) + "</td>",
-          "      </tr>",
-          "      " + bandsHtml,
-          "    </tbody></table>",
-          '    <p class="total"><span>皇誥</span><span>＋寶誥</span><span>本 ＝ <b>' + fmt(total) + '</b></span><span class="sub">' + totalNote + "</span></p>",
-          "  </div>",
-          "  " + motto("勿以善小而不為"),
-          "  " + motto("不求個人福報"),
-          '  <div class="right">',
-          '    <p class="rt">奮鬥參考項目</p>',
-          '    <div class="ritems">' + itemsHtml + "</div>",
-          '    <div class="rsec">',
-          '      <p class="rt">填卡說明</p>',
-          '      <div class="rnotes">' + notesHtml + "</div>",
-          "    </div>",
-          "  </div>",
-          "  " + motto("不為自己打算"),
-          "</div>",
-          "<scr" + "ipt>",
-          '  window.addEventListener("load", function () {',
-          "    setTimeout(function () { window.print(); }, 400);",
-          "  });",
-          "<\/scr" + "ipt>",
-          "</body>",
-          "</html>",
-        ];
-        return lines.join("\n");
-      }
-
       function downloadBlob(blob, filename) {
         var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
@@ -1234,75 +1167,6 @@
         document.body.removeChild(a);
         setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
       }
-      function openPrintDocument(y, m) {
-        var blob = new Blob([buildPrintHtml(y, m)], { type: "text/html;charset=utf-8" });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-      }
-      function downloadPrintDocument(y, m) {
-        var blob = new Blob([buildPrintHtml(y, m)], { type: "text/html;charset=utf-8" });
-        downloadBlob(blob, "奮鬥卡-" + y + "年" + pad(m) + "月.html");
-      }
-      /* Fallback when the native system share sheet cannot be opened:
-         download the same file and tell the user, so they can share
-         the downloaded file from Downloads and still get the system
-         share sheet. */
-      function downloadPrintWithShareNote(y, m) {
-        downloadPrintDocument(y, m);
-        ui.shareNote = true;
-        render();
-      }
-      function sharePrintDocument(y, m) {
-        var filename = "奮鬥卡-" + y + "年" + pad(m) + "月.html";
-        var file;
-        try {
-          // Bare "text/html": a type string carrying parameters
-          // (e.g. ";charset=utf-8") can make canShare() reject the
-          // file even where HTML file sharing is supported.
-          file = new File([buildPrintHtml(y, m)], filename, { type: "text/html" });
-        } catch (err) {
-          downloadPrintWithShareNote(y, m);
-          return;
-        }
-        var data = { files: [file], title: filename };
-        var canFiles = false;
-        try {
-          canFiles = typeof navigator.canShare === "function" && !!navigator.canShare(data);
-        } catch (err) { canFiles = false; }
-        if (canFiles || typeof navigator.share === "function") {
-          // A share API exists (a real browser). Try the native sheet
-          // even when canShare() said no: some browsers under-report
-          // file support, and a refusal just rejects into the fallback.
-          try {
-            navigator.share(data).then(function () {
-              // Shared via the system sheet; clear any earlier fallback hint.
-              if (ui.shareNote) { ui.shareNote = false; render(); }
-            }, function (err) {
-              // The user closing the share sheet is not a failure; anything
-              // else falls back to downloading the same file, with a hint.
-              if (!err || err.name !== "AbortError") downloadPrintWithShareNote(y, m);
-            });
-          } catch (err) {
-            downloadPrintWithShareNote(y, m);
-          }
-        } else {
-          // No Web Share API at all (e.g. inside an app's WebView).
-          // A programmatic download there does not save the file — the
-          // WebView just displays the HTML, which reads as "no sharing".
-          // So don't fire one: show the hint and let the explicit
-          // 「下載列印版檔案」 button do the saving instead.
-          ui.shareNote = true;
-          render();
-        }
-      }
-
       /* ------------------------------------------------------------
          One-tap PDF share — the paper card is rasterized with the
          embedded html2canvas, and the JPEG is wrapped into a real
@@ -1444,7 +1308,6 @@
         viewY: 0, viewM: 0,
         reportY: 0, reportM: 0,
         printPreview: false,
-        shareNote: false,
         pdfBusy: false,
         pdfNote: "",
         pdfError: false,
@@ -1603,7 +1466,7 @@
           '<select id="report-year" aria-label="報表年份" data-change="report-year">' + years + "</select>" +
           '<label for="report-month">月份</label>' +
           '<select id="report-month" aria-label="報表月份" data-change="report-month">' + months + "</select>" +
-          '<button type="button" class="btn-accent" data-act="print-preview">列印／儲存 PDF</button></div>';
+          '<button type="button" class="btn-accent" data-act="print-preview">列印／儲存 奮鬥卡</button></div>';
 
         h += '<div class="stat-grid">' + stats.map(function (s) {
           return '<div class="stat"><p class="sl">' + esc(s.label) + '</p><p class="sv font-display">' + esc(s.value) + "</p></div>";
@@ -1621,7 +1484,7 @@
             return "<p><span>" + it.n + ". " + esc(it.name) + "</span><b>" + c + " 天</b></p>";
           }).join("") + "</div></div>";
 
-        h += '<p class="report-note">下方為擬真實體卡預覽。按上方「列印／儲存 PDF」會開啟列印版頁面，再從該頁開啟或下載列印版檔案列印（橫式 A4）。</p>';
+        h += '<p class="report-note">下方為擬真實體卡預覽。按上方「列印／儲存 奮鬥卡」會開啟列印版頁面，再從該頁分享 PDF 或以瀏覽器列印（橫式 A4）。</p>';
         h += '<div class="card-scroll"><div>' + printCardHtml(y, m) + "</div></div>";
         h += "</section>";
         return h;
@@ -1637,21 +1500,15 @@
         h += '<div class="pp-tools">' +
           '<button type="button" class="btn-ghost" data-act="print-back" style="font-weight:600">← 返回月報表</button>' +
           '<p class="pp-title font-display">' + y + "年" + m + "月奮鬥卡・列印版</p></div>";
-        h += '<p class="pp-desc">在 App 內直接按列印可能不會有反應，請用下面任一方式：「在新頁開啟列印版」會另開一頁並自動跳出列印視窗，可直接列印或存成 PDF；「下載列印版檔案」會把同一份檔案存下來，之後打開就能列印；按分享圖示的「分享列印版檔案」或「分享 PDF」會開啟系統分享選單，可直接傳送給 LINE、Gmail 等 App（在 App 內開啟時若無法直接分享，「分享 PDF」會改為下載 PDF 檔案，請再到「下載」資料夾分享）。也可以留在這一頁，用瀏覽器或裝置自己的「列印」功能——印出來的只會是下面這張卡。</p>';
+        h += '<p class="pp-desc">按分享圖示的「分享 PDF」會產生這個月的奮鬥卡 PDF 並開啟系統分享選單，可直接傳送給 LINE、Gmail 等 App（在 App 內開啟時若無法直接分享，「分享 PDF」會改為下載 PDF 檔案，請再到「下載」資料夾分享）。也可以留在這一頁，按「以瀏覽器列印本頁」直接列印——印出來的只會是下面這張卡（在 App 內直接按列印可能不會有反應）。</p>';
         h += '<div class="pp-actions">' +
-          '<button type="button" class="btn-accent btn-share" data-act="print-share" aria-label="分享列印版檔案">' + SHARE_ICON_SVG + '<span>分享列印版檔案</span></button>' +
           '<button type="button" class="btn-outline-accent btn-share" data-act="print-share-pdf" aria-label="分享 PDF"' + (ui.pdfBusy ? " disabled" : "") + '>' + SHARE_ICON_SVG + '<span>' + (ui.pdfBusy ? "產生 PDF 中…" : "分享 PDF") + "</span></button>" +
-          '<button type="button" class="btn-outline-accent" data-act="print-open">在新頁開啟列印版</button>' +
-          '<button type="button" class="btn-outline-accent" data-act="print-download">下載列印版檔案</button>' +
-          '<button type="button" class="btn-ghost-lg" data-act="print-window">以瀏覽器列印本頁</button></div>';
-        if (ui.shareNote) {
-          h += '<p class="pp-share-note" role="status">這個環境無法直接開啟系統分享選單。請先按「下載列印版檔案」把檔案存下來，再到「下載」資料夾（或檔案 App）對該檔案按「分享」，就能開啟系統分享選單傳送。</p>';
-        }
+          '<button type="button" class="btn-outline-accent" data-act="print-window">以瀏覽器列印本頁</button></div>';
         if (ui.pdfNote) {
           h += '<p class="pp-share-note" role="status">這個環境無法直接開啟系統分享選單，已改為下載 PDF 檔案「' + esc(ui.pdfNote) + '」。請到「下載」資料夾（或檔案 App）對該檔案按「分享」，就能開啟系統分享選單傳送。</p>';
         }
         if (ui.pdfError) {
-          h += '<p class="pp-share-note" role="status">PDF 產生失敗，請改用「下載列印版檔案」，或用「在新頁開啟列印版」開啟後再存成 PDF。</p>';
+          h += '<p class="pp-share-note" role="status">PDF 產生失敗，請改用「以瀏覽器列印本頁」列印，或再試一次。</p>';
         }
         h += "</div>";
         h += '<div class="pp-cardwrap"><div>' + printCardHtml(y, m) + "</div></div>";
@@ -1661,14 +1518,13 @@
       var SLOT_LABELS = {
         "today-initial": "當日初始快照",
         "yesterday": "昨日最終快照",
-        "last-month": "上月封存快照",
         "latest-undo": "最近儲存前快照（復原用）",
       };
 
       function settingsHtml() {
         var p = state.profile;
         var level = Math.min(FONT_LEVELS.length - 1, Math.max(0, p.fontSize));
-        var order = ["today-initial", "yesterday", "last-month", "latest-undo"];
+        var order = ["today-initial", "yesterday", "latest-undo"];
         var snapRows = Object.keys(state.snapshots)
           .map(function (slot) {
             var s = state.snapshots[slot];
@@ -1753,11 +1609,25 @@
           "</div>" +
           '<p class="hint">匯入會以備份內容取代目前全部紀錄；匯入前會自動把現況存入「最近儲存前快照」，可隨時還原。備份檔與新奮鬥卡開發（線上版）通用，可互匯。</p></div>';
 
-        /* 自動快照 */
-        h += '<div class="card"><h2 class="font-display">自動快照</h2>';
-        if (snapRows.length === 0) {
-          h += '<p class="hint" style="margin-top:0.5rem">尚無快照 — 儲存任何一筆紀錄後，系統會自動建立。</p>';
-        } else {
+        /* 自動備份 — three rolling copies; each row shows the data
+           date range it covers and exports that copy as JSON. */
+        h += '<div class="card"><h2 class="font-display">自動備份</h2>' +
+          '<ul class="snap-list">';
+        AUTO_BACKUP_SLOTS.forEach(function (s) {
+          var bk = state.autoBackups[s.key];
+          h += '<li><span class="snap-info"><b>' + s.label + "</b><span>";
+          if (!bk) h += "尚未建立";
+          else if (bk.earliest) h += esc(bk.earliest) + " ～ " + esc(bk.backupDate);
+          else h += "尚無記錄 · " + esc(bk.backupDate);
+          h += "</span></span>";
+          if (bk) {
+            h += '<button type="button" class="btn-sm" data-act="backup-export" data-slot="' + s.key + '" aria-label="匯出' + s.label + '">匯出</button>';
+          }
+          h += "</li>";
+        });
+        h += "</ul>" +
+          '<p class="hint">點開任一天的登錄畫面時，系統會檢查這三份副本：昨日備份超過 24 小時、上週備份超過 7 天、上月備份超過 30 天，就會用目前的資料覆寫更新，備份日期也改為複製當天。每份副本都是全部資料的完整備份（與手動匯出相同的 JSON 格式），匯出的檔案可從上方「資料備份」匯入還原。</p>';
+        if (snapRows.length > 0) {
           h += '<ul class="snap-list">';
           snapRows.forEach(function (s) {
             var label = SLOT_LABELS[s.slot] || s.slot;
@@ -1771,9 +1641,10 @@
             }
             h += "</li>";
           });
-          h += "</ul>";
+          h += "</ul>" +
+            '<p class="hint">還原前會先把目前狀態存入「最近儲存前快照」，還原錯了可以再換回來。</p>';
         }
-        h += '<p class="hint">還原前會先把目前狀態存入「最近儲存前快照」，還原錯了可以再換回來。</p></div>';
+        h += "</div>";
 
         /* 仙佛聖誕一覽 */
         h += '<div class="card"><h2 class="font-display">仙佛聖誕一覽</h2>' +
@@ -1805,6 +1676,7 @@
       var panel = null; // { date, existing, items:Set, classics:[], confirmDelete, error, popup }
 
       function openPanel(iso) {
+        checkAutoBackups();
         var existing = entryByDate(iso);
         panel = {
           date: iso,
@@ -2389,19 +2261,9 @@
             break;
           case "print-back":
             ui.printPreview = false;
-            ui.shareNote = false;
             ui.pdfNote = "";
             ui.pdfError = false;
             render();
-            break;
-          case "print-open":
-            openPrintDocument(ui.reportY, ui.reportM);
-            break;
-          case "print-download":
-            downloadPrintDocument(ui.reportY, ui.reportM);
-            break;
-          case "print-share":
-            sharePrintDocument(ui.reportY, ui.reportM);
             break;
           case "print-share-pdf":
             sharePdfDocument(ui.reportY, ui.reportM);
@@ -2468,6 +2330,14 @@
           case "export":
             doExport();
             break;
+          case "backup-export": {
+            var bslot = autoBackupSlot(elx.getAttribute("data-slot"));
+            var bk2 = bslot ? state.autoBackups[bslot.key] : null;
+            if (bslot && bk2) {
+              downloadBlob(new Blob([bk2.payload], { type: "application/json" }), autoBackupFilename(bslot, bk2));
+            }
+            break;
+          }
           case "import": {
             var f = el("import-file");
             if (f) f.click();
@@ -2510,7 +2380,6 @@
          ------------------------------------------------------------ */
       (function init() {
         loadStore();
-        lazyMonthlyArchive();
         var t = todayLocal();
         ui.viewY = t.y;
         ui.viewM = t.m;
