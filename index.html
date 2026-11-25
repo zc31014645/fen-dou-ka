@@ -165,6 +165,7 @@
       .dayrow .d1 span { display: block; font-size: 0.75rem; color: var(--dim); }
       .dayrow .d2 { width: 4rem; flex-shrink: 0; font-size: 0.75rem; color: var(--dim); }
       .dayrow .d3 { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
+      .dayrow .d3 .total-inline { font-weight: 600; color: var(--gold); }
       .dayrow .badges { margin-top: 0; }
 
       /* ---- cards / sections ---- */
@@ -1319,11 +1320,9 @@
 
       function entryBadgesHtml(e, baoUnit) {
         if (!e) return '<span class="badges"></span>';
-        var total = entryTotal(e, baoUnit);
         var h = '<span class="badges">';
         if (e.items.indexOf(4) >= 0) h += '<span class="dot green" aria-label="有煉心靜坐"></span>';
         if (e.huangCount !== null || e.baoCount !== null) h += '<span class="dot gold" aria-label="有持誦兩誥"></span>';
-        if (total !== null) h += '<span class="total">' + fmtNum(total) + "</span>";
         return h + "</span>";
       }
 
@@ -1352,7 +1351,6 @@
           h += '<span class="lunar">' + esc(lunar.shortLabel) + "</span>";
           h += entryBadgesHtml(e, baoUnit);
           if (hasBirthday) h += '<span class="shou" aria-label="有仙佛聖誕">壽</span>';
-          if (e && e.items.length > 0) h += '<span class="items-line">' + e.items.join("·") + "</span>";
           h += "</button>";
         });
         h += "</div>";
@@ -1369,22 +1367,22 @@
           var isToday = iso === todayIso;
           var hasBirthday = birthdayMatchFor(y, m, day) !== null;
           var aria = m + "月" + day + "日" + (e ? "，已填" : "") + (hasBirthday ? "，有仙佛聖誕" : "");
-          var summary;
+          var summaryHtml;
           if (e) {
-            summary = e.items.length > 0
-              ? e.items.map(function (n) {
-                  var it = ITEMS.filter(function (x) { return x.n === n; })[0];
-                  return it ? it.name : String(n);
-                }).join("、")
-              : (e.note || "（僅誥數／備註）");
+            var tot = entryTotal(e, baoUnit);
+            var parts = [];
+            if (tot !== null) parts.push('<span class="total-inline">' + fmtNum(tot) + "</span>");
+            if (e.items.length > 0) parts.push(esc(e.items.join("、")));
+            if (e.items.length === 0 && e.note) parts.push(esc(e.note));
+            summaryHtml = parts.length > 0 ? parts.join(" · ") : esc("（僅誥數／備註）");
           } else {
-            summary = "尚未填寫";
+            summaryHtml = esc("尚未填寫");
           }
           h += '<button type="button" class="dayrow' + (isToday ? " today" : "") + '" data-act="pick" data-date="' + iso + '" aria-label="' + aria + '">';
           h += '<span class="d1"><b>' + m + "/" + day + "</b><span>星期" + WEEKDAYS[new Date(y, m - 1, day).getDay()] + "</span></span>";
           h += '<span class="d2">農曆' + esc(lunar.fullLabel) + "</span>";
           if (hasBirthday) h += '<span class="shou" aria-label="有仙佛聖誕">壽</span>';
-          h += '<span class="d3">' + esc(summary) + "</span>";
+          h += '<span class="d3">' + summaryHtml + "</span>";
           h += entryBadgesHtml(e, baoUnit);
           h += "</button>";
         }
@@ -1422,7 +1420,7 @@
           h += " · 皇誥 " + fmtNum(sumA) + " · 寶誥 " + fmtNum(sumB) + (baoUnit === "ben" ? " 本" : " 聲") + " · 合計 " + fmtNum(total);
         }
         h += "</p>";
-        h += '<p class="cal-legend">綠點：有煉心靜坐 · 金點：有持誦兩誥 · 紅「壽」字：仙佛聖誕 · 金字：當日誥數合計</p>';
+        h += '<p class="cal-legend">綠點：有煉心靜坐 · 金點：有持誦兩誥 · 紅「壽」字：仙佛聖誕' + (ui.calMode === "day" ? " · 金字：當日誥數合計" : "") + "</p>";
         h += "</section>";
         return h;
       }
